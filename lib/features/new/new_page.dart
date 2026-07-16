@@ -4,6 +4,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/ui/app_toast.dart';
 import '../../core/utils/monogram.dart';
 import '../../data/models/models.dart';
 import '../../providers/article_providers.dart';
@@ -32,14 +33,7 @@ class NewPage extends ConsumerWidget {
       try {
         await ref.read(feedActionsProvider).refreshAll();
       } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$e'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+        if (context.mounted) showAppToast('$e', context: context);
       }
     }
 
@@ -69,12 +63,7 @@ class NewPage extends ConsumerWidget {
                       const Spacer(),
                       IconButton(
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('筛选会在接上真实订阅后开放'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          showAppToast('筛选会在接上真实订阅后开放', context: context);
                         },
                         icon: Icon(
                           Icons.tune_rounded,

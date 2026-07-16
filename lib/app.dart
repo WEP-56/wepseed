@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'core/background/background_refresh_service.dart';
 import 'core/background/notification_service.dart';
+import 'core/ui/app_toast.dart';
 import 'data/models/models.dart';
 import 'providers/comment_providers.dart';
 import 'providers/settings_provider.dart';
@@ -13,8 +14,6 @@ import 'router/app_router.dart';
 
 class WepseedApp extends ConsumerWidget {
   const WepseedApp({super.key});
-
-  static final _messengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,22 +43,17 @@ class WepseedApp extends ConsumerWidget {
           continue;
         }
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          final messenger = _messengerKey.currentState;
-          if (messenger == null) return;
-          messenger.hideCurrentSnackBar();
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text(event.message),
-              behavior: SnackBarBehavior.floating,
-              action: event.type == CommentActivityEventType.failed
-                  ? null
-                  : SnackBarAction(
-                      label: '查看',
-                      onPressed: () => router.go(
-                        '/article/${Uri.encodeComponent(entry.key)}?comments=1',
-                      ),
+          showAppToast(
+            event.message,
+            messenger: appMessengerKey.currentState,
+            action: event.type == CommentActivityEventType.failed
+                ? null
+                : SnackBarAction(
+                    label: '查看',
+                    onPressed: () => router.go(
+                      '/article/${Uri.encodeComponent(entry.key)}?comments=1',
                     ),
-            ),
+                  ),
           );
         });
       }
@@ -68,7 +62,7 @@ class WepseedApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'wepseed',
       debugShowCheckedModeBanner: false,
-      scaffoldMessengerKey: _messengerKey,
+      scaffoldMessengerKey: appMessengerKey,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: settings.themeMode,

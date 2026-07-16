@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/ui/app_toast.dart';
 import '../../core/utils/monogram.dart';
 import '../../core/utils/open_url.dart';
 import '../../core/utils/time_labels.dart';
@@ -114,37 +115,18 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
         : article.source.siteUrl;
     final ok = await openExternalUrl(url);
     if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('没有可打开的原文链接'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showAppToast('没有可打开的原文链接', context: context);
     }
   }
 
   Future<void> _copyLink(Article article) async {
     final url = article.link?.trim();
     if (url == null || url.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('没有可复制的链接'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      if (mounted) showAppToast('没有可复制的链接', context: context);
       return;
     }
     await Clipboard.setData(ClipboardData(text: url));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('链接已复制'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+    if (mounted) showAppToast('链接已复制', context: context);
   }
 
   Future<void> _share(Article article) async {
@@ -169,14 +151,7 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
     buf.writeln();
     buf.writeln(article.body);
     await Clipboard.setData(ClipboardData(text: buf.toString()));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Markdown 已复制到剪贴板'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+    if (mounted) showAppToast('Markdown 已复制到剪贴板', context: context);
   }
 
   Future<void> _openComments(String articleId) async {

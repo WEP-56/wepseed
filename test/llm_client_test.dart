@@ -145,6 +145,67 @@ void main() {
     );
   });
 
+  test('HttpLlmClient retries 500 then succeeds', () async {
+    var calls = 0;
+    final mock = MockClient((request) async {
+      calls++;
+      if (calls == 1) {
+        return http.Response('{"error":{"message":"busy"}}', 500);
+      }
+      return http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {'role': 'assistant', 'content': '重试后成功'},
+            },
+          ],
+        }),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+    final client = HttpLlmClient(client: mock);
+    final text = await client.complete(
+      const [LlmMessage(role: 'user', content: 'hi')],
+      const LlmRequestConfig(
+        protocol: LlmProtocol.openaiChatCompletions,
+        baseUrl: 'https://api.example.com/v1',
+        modelId: 'gpt-test',
+        apiKey: 'sk',
+        timeout: Duration(seconds: 5),
+      ),
+    );
+    expect(text, '重试后成功');
+    expect(calls, 2);
+  });
+
+  test('HttpLlmClient does not retry 401', () async {
+    var calls = 0;
+    final mock = MockClient((request) async {
+      calls++;
+      return http.Response(
+        jsonEncode({
+          'error': {'message': 'bad key'},
+        }),
+        401,
+      );
+    });
+    final client = HttpLlmClient(client: mock);
+    await expectLater(
+      client.complete(
+        const [LlmMessage(role: 'user', content: 'hi')],
+        const LlmRequestConfig(
+          protocol: LlmProtocol.openaiChatCompletions,
+          baseUrl: 'https://api.example.com/v1',
+          modelId: 'gpt-test',
+          apiKey: 'bad',
+        ),
+      ),
+      throwsA(isA<LlmException>()),
+    );
+    expect(calls, 1);
+  });
+
   test('netizenTopLevelMessages includes title and system hint', () {
     const netizen = Netizen(
       id: 'n1',

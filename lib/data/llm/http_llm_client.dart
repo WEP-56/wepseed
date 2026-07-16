@@ -232,29 +232,57 @@ class HttpLlmClient implements LlmClient {
     );
   }
 
+  static const _maxAttempts = 3; // 1 initial + 2 retries
+
   Future<http.Response> _postJson(
     Uri uri, {
     required Map<String, String> headers,
     required Map<String, dynamic> body,
     required Duration timeout,
   }) async {
-    http.Response res;
-    try {
-      res = await _client
-          .post(uri, headers: headers, body: jsonEncode(body))
-          .timeout(timeout);
-    } on TimeoutException {
-      throw LlmException('请求超时，请稍后重试');
-    } catch (e) {
-      throw LlmException('网络错误：$e');
+    final encoded = jsonEncode(body);
+    Object? lastError;
+    for (var attempt = 0; attempt < _maxAttempts; attempt++) {
+      if (attempt > 0) {
+        final delayMs = attempt == 1 ? 400 : 1200;
+        await Future<void>.delayed(Duration(milliseconds: delayMs));
+      }
+      try {
+        final res = await _client
+            .post(uri, headers: headers, body: encoded)
+            .timeout(timeout);
+        if (res.statusCode >= 200 && res.statusCode < 300) return res;
+
+        final responseBody = _decodeUtf8Body(res);
+        final retryable = res.statusCode == 429 || res.statusCode >= 500;
+        final err = LlmException(
+          _friendlyError(res.statusCode, responseBody),
+          statusCode: res.statusCode,
+          body: responseBody,
+        );
+        if (!retryable || attempt >= _maxAttempts - 1) throw err;
+
+        // Honor Retry-After seconds when present (429).
+        final retryAfter = res.headers['retry-after'];
+        final secs = int.tryParse(retryAfter ?? '');
+        if (secs != null && secs > 0 && secs <= 30) {
+          await Future<void>.delayed(Duration(seconds: secs));
+        }
+        lastError = err;
+        continue;
+      } on TimeoutException {
+        lastError = LlmException('请求超时，请稍后重试');
+        if (attempt >= _maxAttempts - 1) throw lastError;
+      } on LlmException {
+        rethrow;
+      } catch (e) {
+        lastError = LlmException('网络错误：$e');
+        if (attempt >= _maxAttempts - 1) throw lastError;
+      }
     }
-    if (res.statusCode >= 200 && res.statusCode < 300) return res;
-    final responseBody = _decodeUtf8Body(res);
-    throw LlmException(
-      _friendlyError(res.statusCode, responseBody),
-      statusCode: res.statusCode,
-      body: responseBody,
-    );
+    throw lastError is LlmException
+        ? lastError
+        : LlmException('请求失败');
   }
 
   /// JSON APIs are UTF-8 by specification, but many compatible gateways omit

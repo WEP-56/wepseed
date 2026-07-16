@@ -1,16 +1,27 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
+import '../../core/config/app_links.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/ui/app_toast.dart';
 import '../../core/utils/monogram.dart';
+import '../../core/utils/open_url.dart';
 import '../../data/models/models.dart';
+import '../../data/update/github_update_service.dart';
 import '../../providers/feed_providers.dart';
 import '../../providers/settings_provider.dart';
 import 'llm_settings_section.dart';
 
 class SetPage extends ConsumerWidget {
   const SetPage({super.key});
+
+  static final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -22,7 +33,11 @@ class SetPage extends ConsumerWidget {
     final top = MediaQuery.paddingOf(context).top;
     final controller = ref.read(settingsControllerProvider);
 
-    return ListView(
+    return FutureBuilder<PackageInfo>(
+      future: _packageInfo,
+      builder: (context, snap) {
+        final version = snap.data?.version ?? '0.0.1';
+        return ListView(
       physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.fromLTRB(20, top + 10, 20, 120),
       children: [
@@ -103,7 +118,7 @@ class SetPage extends ConsumerWidget {
         ),
         LlmSettingsSection(
           settings: settings,
-          onToast: (msg) => _toast(context, msg),
+          onToast: (msg) => showAppToast(msg, context: context),
         ),
         _Section(
           title: 'DATA',
@@ -132,13 +147,13 @@ class SetPage extends ConsumerWidget {
               icon: Icons.cleaning_services_outlined,
               title: '清理缓存',
               subtitle: '图片与临时文件',
-              onTap: () => _toast(context, '缓存已清理（模拟）'),
+              onTap: () => showAppToast('缓存已清理（模拟）', context: context),
             ),
             _NavTile(
               icon: Icons.ios_share_rounded,
               title: '导出我的数据',
               subtitle: '收藏 / 对话 / 设置',
-              onTap: () => _toast(context, '数据导出 · 占位'),
+              onTap: () => showAppToast('数据导出 · 占位', context: context),
             ),
           ],
         ),
@@ -148,33 +163,33 @@ class SetPage extends ConsumerWidget {
             _NavTile(
               icon: Icons.system_update_alt_rounded,
               title: '检查更新',
-              subtitle: '当前 1.0.0',
-              onTap: () => _openUpdates(context),
+              subtitle: '当前 $version',
+              onTap: () => _openUpdates(context, version),
             ),
             _NavTile(
               icon: Icons.description_outlined,
               title: '用户协议',
-              subtitle: '使用条款',
-              onTap: () => _openLegal(context, kind: _LegalKind.terms),
+              subtitle: '在 GitHub 查看',
+              onTap: () => openExternalUrl(kTermsUrl),
             ),
             _NavTile(
               icon: Icons.privacy_tip_outlined,
               title: '隐私政策',
-              subtitle: '本地优先说明',
-              onTap: () => _openLegal(context, kind: _LegalKind.privacy),
+              subtitle: '在 GitHub 查看',
+              onTap: () => openExternalUrl(kPrivacyUrl),
             ),
             _NavTile(
               icon: Icons.info_outline_rounded,
               title: '关于 WEPSEED',
               subtitle: '本地优先的 RSS 阅读器',
-              onTap: () => _openAbout(context),
+              onTap: () => _openAbout(context, version),
             ),
           ],
         ),
         const SizedBox(height: 12),
         Center(
           child: Text(
-            'WEPSEED  ·  1.0.0',
+            'WEPSEED  ·  $version',
             style: theme.textTheme.labelSmall?.copyWith(
               color: isDark
                   ? AppColors.textTertiaryDark
@@ -185,6 +200,8 @@ class SetPage extends ConsumerWidget {
         ),
       ],
     );
+      },
+    );
   }
 
   String _themeLabel(ThemeMode mode) => switch (mode) {
@@ -192,12 +209,6 @@ class SetPage extends ConsumerWidget {
         ThemeMode.light => '浅色',
         ThemeMode.dark => '深色',
       };
-
-  void _toast(BuildContext context, String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
-    );
-  }
 
   String _feedsSubtitle(WidgetRef ref) {
     final feeds = ref.watch(feedsProvider).value;
@@ -246,12 +257,7 @@ class SetPage extends ConsumerWidget {
                             } catch (e) {
                               setModal(() => busy = false);
                               if (ctx.mounted) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  SnackBar(
-                                    content: Text('$e'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                showAppToast('$e', context: ctx);
                               }
                             }
                           },
@@ -265,7 +271,7 @@ class SetPage extends ConsumerWidget {
     );
 
     if (ok == true && context.mounted) {
-      _toast(context, '已添加订阅');
+      showAppToast('已添加订阅', context: context);
     }
   }
 
@@ -326,21 +332,11 @@ class SetPage extends ConsumerWidget {
                                   try {
                                     await actions.refreshFeed(f.id);
                                     if (ctx.mounted) {
-                                      ScaffoldMessenger.of(ctx).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('已刷新'),
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      );
+                                      showAppToast('已刷新', context: ctx);
                                     }
                                   } catch (e) {
                                     if (ctx.mounted) {
-                                      ScaffoldMessenger.of(ctx).showSnackBar(
-                                        SnackBar(
-                                          content: Text('$e'),
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      );
+                                      showAppToast('$e', context: ctx);
                                     }
                                   }
                                 } else if (v == 'delete') {
@@ -414,12 +410,7 @@ class SetPage extends ConsumerWidget {
                             } catch (e) {
                               setModal(() => busy = false);
                               if (ctx.mounted) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  SnackBar(
-                                    content: Text('$e'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                showAppToast('$e', context: ctx);
                               }
                             }
                           },
@@ -433,7 +424,7 @@ class SetPage extends ConsumerWidget {
     );
 
     if (ok == true && context.mounted) {
-      _toast(context, 'OPML 导入完成');
+      showAppToast('OPML 导入完成', context: context);
     }
   }
 
@@ -441,9 +432,11 @@ class SetPage extends ConsumerWidget {
     try {
       final xml = await ref.read(feedActionsProvider).exportOpml();
       await Clipboard.setData(ClipboardData(text: xml));
-      if (context.mounted) _toast(context, 'OPML 已复制到剪贴板');
+      if (context.mounted) {
+        showAppToast('OPML 已复制到剪贴板', context: context);
+      }
     } catch (e) {
-      if (context.mounted) _toast(context, '$e');
+      if (context.mounted) showAppToast('$e', context: context);
     }
   }
 
@@ -618,76 +611,16 @@ class SetPage extends ConsumerWidget {
     }
   }
 
-  Future<void> _openUpdates(BuildContext context) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return _SheetScaffold(
-          title: '检查更新',
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '当前版本 1.0.0',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '已是最新。后续会在这里显示更新日志与下载。',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              _PrimaryButton(
-                label: '好的',
-                onTap: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _openLegal(
-    BuildContext context, {
-    required _LegalKind kind,
-  }) async {
-    final isTerms = kind == _LegalKind.terms;
+  Future<void> _openUpdates(BuildContext context, String currentVersion) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return _SheetScaffold(
-          title: isTerms ? '用户协议' : '隐私政策',
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isTerms
-                    ? 'WEPSEED 是一款本地优先的 RSS 阅读工具。你对自己添加的订阅源、笔记与对话内容负责。请勿将本应用用于违法用途。本协议为产品原型占位文本，正式版将替换为完整条款。'
-                    : '默认本地存储：订阅、收藏、对话与设置保存在本机。LLM 请求仅在你配置 API Key 后发往你指定的服务商。我们不运营账号体系，也不主动上传你的阅读数据。本政策为产品原型占位文本。',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(height: 1.55),
-              ),
-              const SizedBox(height: 16),
-              _PrimaryButton(
-                label: '关闭',
-                onTap: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (ctx) => _UpdateSheet(currentVersion: currentVersion),
     );
   }
 
-  Future<void> _openAbout(BuildContext context) async {
+  Future<void> _openAbout(BuildContext context, String version) async {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -731,7 +664,7 @@ class SetPage extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Version 1.0.0',
+                'Version $version',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: isDark
                       ? AppColors.textTertiaryDark
@@ -740,8 +673,13 @@ class SetPage extends ConsumerWidget {
               ),
               const SizedBox(height: 18),
               _PrimaryButton(
-                label: '关闭',
-                onTap: () => Navigator.pop(context),
+                label: 'GitHub 仓库',
+                onTap: () => openExternalUrl(kGithubHome),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('关闭'),
               ),
             ],
           ),
@@ -751,7 +689,214 @@ class SetPage extends ConsumerWidget {
   }
 }
 
-enum _LegalKind { terms, privacy }
+/// Check GitHub Releases → optional in-app download + install.
+class _UpdateSheet extends StatefulWidget {
+  const _UpdateSheet({required this.currentVersion});
+
+  final String currentVersion;
+
+  @override
+  State<_UpdateSheet> createState() => _UpdateSheetState();
+}
+
+class _UpdateSheetState extends State<_UpdateSheet> {
+  final _service = GithubUpdateService();
+  bool _loading = true;
+  String? _error;
+  UpdateCheckResult? _result;
+  bool _downloading = false;
+  double _progress = 0;
+  String? _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await _service.check(widget.currentVersion);
+      if (!mounted) return;
+      setState(() {
+        _result = result;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '$e';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _downloadAndInstall() async {
+    final latest = _result?.latest;
+    if (latest == null) return;
+    final asset = _service.pickApkAsset(latest);
+    if (asset == null) {
+      await openExternalUrl(latest.htmlUrl);
+      return;
+    }
+
+    setState(() {
+      _downloading = true;
+      _progress = 0;
+      _status = '下载中…';
+    });
+
+    try {
+      final file = await _service.downloadApk(
+        asset,
+        onProgress: (p) {
+          if (mounted) setState(() => _progress = p);
+        },
+      );
+      if (!mounted) return;
+
+      if (Platform.isAndroid) {
+        setState(() => _status = '请求安装权限…');
+        final status = await Permission.requestInstallPackages.request();
+        if (!status.isGranted) {
+          setState(() {
+            _downloading = false;
+            _status = null;
+          });
+          if (mounted) {
+            showAppToast(
+              '需要允许「安装未知应用」才能继续；也可在浏览器打开 Release',
+              context: context,
+              duration: const Duration(seconds: 3),
+            );
+          }
+          await openExternalUrl(asset.downloadUrl);
+          return;
+        }
+      }
+
+      setState(() => _status = '正在调起安装…');
+      final openResult = await OpenFilex.open(
+        file.path,
+        type: 'application/vnd.android.package-archive',
+      );
+      if (!mounted) return;
+      if (openResult.type != ResultType.done) {
+        showAppToast(
+          '无法打开安装器：${openResult.message}',
+          context: context,
+        );
+        await openExternalUrl(asset.downloadUrl);
+      } else {
+        showAppToast('请按系统提示完成安装', context: context);
+      }
+    } catch (e) {
+      if (mounted) {
+        showAppToast('下载失败：$e', context: context);
+        final url = _service.pickApkAsset(latest)?.downloadUrl ?? latest.htmlUrl;
+        await openExternalUrl(url);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _downloading = false;
+          _status = null;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return _SheetScaffold(
+      title: '检查更新',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '当前版本 ${widget.currentVersion}',
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(height: 12),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else if (_error != null) ...[
+            Text(
+              _error!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _PrimaryButton(label: '重试', onTap: _check),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => openExternalUrl(kGithubReleases),
+              child: const Text('在浏览器打开 Releases'),
+            ),
+          ] else if (_result != null && !_result!.hasUpdate) ...[
+            Text(
+              '已是最新（${_result!.latest?.version ?? widget.currentVersion}）',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            _PrimaryButton(
+              label: '好的',
+              onTap: () => Navigator.pop(context),
+            ),
+          ] else if (_result?.latest != null) ...[
+            Text(
+              '发现新版本 ${_result!.latest!.version}',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (_result!.latest!.body.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 140),
+                child: SingleChildScrollView(
+                  child: Text(
+                    _result!.latest!.body,
+                    style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                  ),
+                ),
+              ),
+            ],
+            if (_downloading) ...[
+              const SizedBox(height: 14),
+              LinearProgressIndicator(value: _progress > 0 ? _progress : null),
+              const SizedBox(height: 8),
+              Text(
+                _status ?? '下载中… ${(_progress * 100).round()}%',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+            const SizedBox(height: 16),
+            _PrimaryButton(
+              label: _downloading ? '请稍候…' : '下载并安装',
+              onTap: _downloading ? () {} : _downloadAndInstall,
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => openExternalUrl(_result!.latest!.htmlUrl),
+              child: const Text('在浏览器打开 Release'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
 class _Section extends StatelessWidget {
   const _Section({required this.title, required this.children});

@@ -5,6 +5,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/ui/app_toast.dart';
 import '../../core/utils/monogram.dart';
 import '../../providers/article_providers.dart';
 import '../../providers/feed_providers.dart';
@@ -35,12 +36,7 @@ class _SourceFeedPageState extends ConsumerState<SourceFeedPage> {
       await ref.read(feedActionsProvider).refreshFeed(widget.sourceId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$e'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showAppToast('$e', context: context);
     }
   }
 
@@ -95,14 +91,7 @@ class _SourceFeedPageState extends ConsumerState<SourceFeedPage> {
                   onTap: () async {
                     await Clipboard.setData(ClipboardData(text: source.url!));
                     if (ctx.mounted) Navigator.pop(ctx);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('已复制'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
+                    if (mounted) showAppToast('已复制', context: context);
                   },
                 ),
               ListTile(

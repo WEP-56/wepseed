@@ -7,7 +7,10 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/ui/app_toast.dart';
 import '../../core/utils/monogram.dart';
+import '../../data/llm/http_llm_client.dart';
+import '../../data/llm/llm_client.dart';
 import '../../data/models/models.dart';
 import '../../providers/comment_providers.dart';
 import '../../providers/core_providers.dart';
@@ -250,6 +253,7 @@ class _ProviderEditorSheetState extends ConsumerState<_ProviderEditorSheet> {
   late int _maxConcurrent;
   late final String _id;
   bool _savingModel = false;
+  bool _testing = false;
   String? _inlineHint;
 
   /// After a successful write, pin the list from getModels so UI updates even
@@ -438,7 +442,29 @@ class _ProviderEditorSheetState extends ConsumerState<_ProviderEditorSheet> {
                 label: Text(_savingModel ? '保存中…' : '添加模型'),
               ),
               const SizedBox(height: 12),
-              _PrimaryButton(label: '保存', onTap: _save),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: (_testing || _savingModel) ? null : _testConnection,
+                      child: _testing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('测试连接'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _PrimaryButton(
+                      label: '保存',
+                      onTap: (_testing || _savingModel) ? () {} : _save,
+                    ),
+                  ),
+                ],
+              ),
               if (widget.existing != null) ...[
                 const SizedBox(height: 8),
                 TextButton(
@@ -525,11 +551,72 @@ class _ProviderEditorSheetState extends ConsumerState<_ProviderEditorSheet> {
   }
 
   void _toast(String msg) {
-    // Prefer root messenger — sheet-local SnackBars often hide under the modal.
-    final root = ScaffoldMessenger.maybeOf(context);
-    root?.showSnackBar(
-      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+    showAppToast(msg, context: context);
+  }
+
+  Future<void> _testConnection() async {
+    final models = _modelsPinned ??
+        ref.read(llmModelsForProviderProvider(_id)).value ??
+        const <LlmModel>[];
+    if (models.isEmpty) {
+      setState(() => _inlineHint = '请先添加至少一个模型，再测试连接');
+      return;
+    }
+    final base = _baseUrl.text.trim().isEmpty
+        ? 'https://api.openai.com/v1'
+        : _baseUrl.text.trim();
+    var key = _apiKey.text.trim();
+    if (key.isEmpty) {
+      key = (await ref
+                  .read(llmProviderRepositoryProvider)
+                  .getApiKey(_id))
+              ?.trim() ??
+          '';
+    }
+    if (key.isEmpty) {
+      setState(() => _inlineHint = '请填写 API Key 后再测试');
+      return;
+    }
+
+    final model = models.firstWhere(
+      (m) => m.isDefault,
+      orElse: () => models.first,
     );
+
+    setState(() {
+      _testing = true;
+      _inlineHint = '正在测试连接…';
+    });
+    try {
+      // Bypass scheduler so a probe never blocks comment generation.
+      final client = HttpLlmClient();
+      final text = await client.complete(
+        const [
+          LlmMessage(role: 'user', content: '只回复两个字母：OK'),
+        ],
+        LlmRequestConfig(
+          providerId: _id,
+          protocol: _protocol,
+          baseUrl: base,
+          modelId: model.modelId,
+          apiKey: key,
+          timeout: const Duration(seconds: 20),
+          maxTokens: 16,
+          temperature: 0,
+        ),
+      );
+      final preview = text.length > 40 ? '${text.substring(0, 40)}…' : text;
+      if (mounted) {
+        setState(() => _inlineHint = '连接成功：$preview');
+        _toast('连接成功');
+      }
+    } on LlmException catch (e) {
+      if (mounted) setState(() => _inlineHint = '连接失败：${e.message}');
+    } catch (e) {
+      if (mounted) setState(() => _inlineHint = '连接失败：$e');
+    } finally {
+      if (mounted) setState(() => _testing = false);
+    }
   }
 
   /// Persist provider row (+ optional key). Used by Save and before model insert.
