@@ -52,14 +52,11 @@ cp android/key.properties.example android/key.properties
    - `wepseed-<ver>-armeabi-v7a.apk`
    - `wepseed-<ver>-x86_64.apk`
 
-正式签名请在仓库 Secrets 配置：
+正式签名（生成 keystore、填 Secrets、打 tag）的**完整私密步骤**见本机：
 
-| Secret | 说明 |
-|--------|------|
-| `KEYSTORE_BASE64` | `base64 -w0 android/app/upload-keystore.jks` |
-| `KEYSTORE_PASSWORD` | keystore 密码 |
-| `KEY_PASSWORD` | key 密码 |
-| `KEY_ALIAS` | 如 `upload` |
+`docs/SIGNING.private.md`（已 gitignore，不进仓库）
+
+公开 Secrets 名（值只写 GitHub Actions secrets）：`KEYSTORE_BASE64` · `KEYSTORE_PASSWORD` · `KEY_PASSWORD` · `KEY_ALIAS`。
 
 未配置 secrets 时仍会出包，但为 **debug 签名**（仅内测）。
 
