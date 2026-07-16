@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Sample RSS</title>
+    <link>https://example.com/</link>
+    <description>A sample feed</description>
+    <item>
+      <title>First Post</title>
+      <link>https://example.com/posts/1</link>
+      <guid isPermaLink="true">https://example.com/posts/1</guid>
+      <pubDate>Mon, 01 Jan 2024 12:00:00 GMT</pubDate>
+      <description><![CDATA[<p>Hello <b>world</b></p><img src="https://example.com/img1.jpg"/>]]></description>
+    </item>
+    <item>
+      <title>Second Post</title>
+      <link>https://example.com/posts/2</link>
+      <guid>unique-guid-2</guid>
+      <pubDate>Tue, 02 Jan 2024 15:30:00 GMT</pubDate>
+      <description>Plain summary only</description>
+      <enclosure url="https://example.com/cover.png" type="image/png" length="123"/>
+    </item>
+  </channel>
+</rss>

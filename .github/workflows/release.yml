@@ -1,0 +1,128 @@
+# Tag-driven Android release.
+# Push a tag like v1.6.0 → builds per-ABI APKs and attaches them to a GitHub Release.
+#
+# Required for *signed* builds (recommended before public install):
+#   KEYSTORE_BASE64   base64 of android/app/upload-keystore.jks
+#   KEYSTORE_PASSWORD
+#   KEY_PASSWORD
+#   KEY_ALIAS
+# Without secrets the workflow still builds, but APKs are signed with the
+# debug key (fine for internal smoke tests only).
+
+name: Release Android
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: Build split APKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Decode upload keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ] || [ -z "${KEYSTORE_PASSWORD:-}" ] || [ -z "${KEY_PASSWORD:-}" ] || [ -z "${KEY_ALIAS:-}" ]; then
+            echo "Signing secrets missing — release APKs will use the debug keystore."
+            echo "SIGNED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          {
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyPassword=$KEY_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "storeFile=upload-keystore.jks"
+          } > android/key.properties
+          echo "SIGNED=true" >> "$GITHUB_ENV"
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test
+
+      - name: Resolve version from tag
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          NAME="${TAG#v}"
+          CODE="${GITHUB_RUN_NUMBER}"
+          echo "build_name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "build_number=$CODE" >> "$GITHUB_OUTPUT"
+          echo "Building $NAME+$CODE (tag $TAG)"
+
+      - name: Build per-ABI release APKs
+        run: |
+          flutter build apk --release --split-per-abi \
+            --build-name="${{ steps.ver.outputs.build_name }}" \
+            --build-number="${{ steps.ver.outputs.build_number }}"
+
+      - name: List artifacts
+        run: ls -lh build/app/outputs/flutter-apk/
+
+      - name: Rename APKs with version
+        run: |
+          set -euo pipefail
+          VER="${{ steps.ver.outputs.build_name }}"
+          mkdir -p dist
+          for abi in armeabi-v7a arm64-v8a x86_64; do
+            src="build/app/outputs/flutter-apk/app-${abi}-release.apk"
+            if [ -f "$src" ]; then
+              dest="dist/wepseed-${VER}-${abi}.apk"
+              cp "$src" "$dest"
+              echo "  $dest ($(du -h "$dest" | cut -f1))"
+            fi
+          done
+          test -n "$(ls -A dist 2>/dev/null)" || { echo "No APKs produced"; exit 1; }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: WEPSEED ${{ steps.ver.outputs.build_name }}
+          generate_release_notes: true
+          body: |
+            ## Android APKs (split by ABI)
+
+            | Asset | Target |
+            |-------|--------|
+            | `wepseed-*-arm64-v8a.apk` | Most phones (64-bit ARM) — **preferred** |
+            | `wepseed-*-armeabi-v7a.apk` | Older 32-bit ARM devices |
+            | `wepseed-*-x86_64.apk` | Emulators / rare x86_64 devices |
+
+            Do **not** install a fat/universal package; pick the ABI that matches the device.
+
+            - Version: `${{ steps.ver.outputs.build_name }}+${{ steps.ver.outputs.build_number }}`
+            - Signing: check job log for `SIGNED=true` (upload keystore) vs debug fallback
+          files: dist/*.apk
+          fail_on_unmatched_files: true

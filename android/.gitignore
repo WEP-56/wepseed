@@ -1,0 +1,14 @@
+/.gradle
+/captures/
+/local.properties
+GeneratedPluginRegistrant.java
+.cxx/
+
+# Remember to never publicly share your keystore.
+# See https://flutter.dev/to/reference-keystore
+key.properties
+**/*.keystore
+**/*.jks
+
+# Keep gradle wrapper + scripts in VCS so CI can build offline of flutter doctor quirks.
+# (Do NOT ignore gradlew / gradle-wrapper.jar)

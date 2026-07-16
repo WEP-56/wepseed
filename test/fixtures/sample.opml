@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Test</title>
+  </head>
+  <body>
+    <outline text="Group">
+      <outline type="rss" text="Feed A" title="Feed A" xmlUrl="https://a.example.com/rss"/>
+      <outline type="rss" text="Feed B" xmlUrl="https://b.example.com/atom.xml" htmlUrl="https://b.example.com"/>
+    </outline>
+  </body>
+</opml>
