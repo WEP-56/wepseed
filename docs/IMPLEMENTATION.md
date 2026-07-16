@@ -1,8 +1,8 @@
 # WEPSEED 功能实现文档
 
-> 版本：Phase E 1.6.0（Warm 持久化 · 温度规则 · 后台刷新通知）  
+> 版本：**0.0.2**（tag `v0.0.2` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
 > 平台：Flutter · Android 首发 · 本地优先（local-only）  
-> 状态：**A–E 主路径已接**；D 仅余真实端点验收/流式，E 仅余厂商 ROM 长期实机验收与评论任务杀进程恢复  
+> 状态：**A–E 主路径 + F 一批打磨已接**（返回/关于更新/Toast/LLM 重试与测连/Release CI）；用户 **真机验收 0.0.2 中**  
 > 开关：`kUseMockFeed` / `kUseMockComments`（`lib/core/config/app_flags.dart`）
 
 本文档只写**要做什么、做成什么样、怎么落地**。  
@@ -32,81 +32,74 @@
 | 读 | 详情正文、已读、收藏 | **HTML 正文 + 图缓存 + 目录 scrubber**；外链系统浏览器 |
 | 评 | TikTok 式评论区 + 多网友 | **配置真 + 内容真 LLM**（无 Key **不灌 mock**；见 §1.5 乱码/模型保存） |
 | 回看 | ME 时间轴 | **Drift 持久化**；dwell/binge/streak/nightOwl 规则已接 |
-| 设 | 形象、主题、字号、多提供商/网友、DATA、关于 | **大部分真持久化** |
+| 设 | 形象、主题、字号、多提供商/网友、DATA、关于 | **大部分真持久化**；关于 = 真版本 + GitHub 更新/协议 |
 | 推 | WorkManager + 本地通知 | **已接 Android 周期刷新 + 新文章通知 + 文章深链** |
+| 发 | tag 驱动 Release | **已接** per-ABI APK + GitHub Actions（`v*`） |
 
 ---
 
-## 1. 当前代码现状（2026-07-15 对照）
+## 1. 当前代码现状（2026-07-16 对照 · **0.0.2**）
 
 ### 1.1 目录
 
 ```
 lib/
-  main.dart / app.dart / app_shell.dart
+  main.dart / app.dart / app_shell.dart   # AppShell: PopScope 双击退出
   router/app_router.dart          # / · /article/:id · /source/:id
-  core/config/app_flags.dart      # kUseMockFeed / kUseMockComments
+  core/config/app_flags.dart · app_links.dart   # GitHub / 协议 / API 常量
+  core/ui/app_toast.dart          # 抬高底栏的统一 Toast
   core/theme/…  core/utils/open_url.dart · time_labels.dart · monogram.dart
+  core/background/                # WorkManager + 本地通知
   data/
-    models/models.dart            # FeedSource(+isPaused), Article(+contentHtml),
-                                  # Netizen, Comment, Llm*, AppSettings…
-    mock/mock_data.dart           # 仅 kUseMockFeed=true 时用
+    models/models.dart
+    mock/mock_data.dart           # 仅 kUseMockFeed=true
     db/tables.dart + app_database.dart   # Drift schemaVersion = 3
-    rss/                          # client · parser · opml · models
-    llm/                          # HttpLlmClient · prompt · resolve
-    repositories/
-      feed_repository.dart + mock + drift_feed_repository.dart
-      article_repository.dart + mock + drift_article_repository.dart
-      settings / llm / netizen / comment / warm（warm 真 Drift）
-  providers/
-    core_providers.dart           # kUseMockFeed + llmClientProvider
-    settings / feed / article / llm / netizen / comment / me / shell
+    rss/ · llm/                   # HttpLlmClient 含重试
+    update/github_update_service.dart    # Releases 检查 + 下载
+    repositories/ … warm Drift …
+  providers/ …
   features/
-    new/
-      new_page.dart               # 真流 masonry（无时间轨）
-      feed_card · source_feed_page
-      article_detail_page.dart    # HTML 正文 · 目录 scrubber · dwell · 外链
-      article_body.dart · article_toc.dart · comment_sheet.dart
-    me/   me_page
-    set/  set_page（RSS 真管理）· llm_settings_section
-  widgets/
-    edge_scrubber.dart            # 详情目录 scrubber（New 不用）
-    app_network_image.dart · glass_bottom_nav · liquid_glass · pressable
+    new/ …  me/ …
+    set/  set_page（RSS + 检查更新下载安装）· llm_settings_section（测试连接）
+  widgets/ glass_bottom_nav · edge_scrubber · …
+docs/
+  IMPLEMENTATION.md · TERMS.md · PRIVACY.md
+  SIGNING.private.md              # gitignore：签名/Secrets 私密手册
+.github/workflows/
+  ci.yml · release.yml            # tag v* → 分包 APK Release
+android/                          # 官方 Maven 优先；Aliyun 备用
 test/
-  fixtures/ sample_rss · sample_atom · sample.opml
-  rss_parser · toc_extract · time_labels · llm_client
+  fixtures/ · rss_parser · toc · time_labels · llm_client · semver · warm · widget
 ```
 
 ### 1.2 已可交互（真 / 半真）
 
 | 模块 | 状态 |
 |------|------|
-| 壳 / 路由 | go_router；三 Tab + 玻璃底栏 |
+| 壳 / 路由 | go_router；三 Tab + 玻璃底栏；**根页返回**：非 New→回 New，New 上 **2s 内再按退出** |
 | 主题 / 字号 / 形象 | Drift 持久化；深色次级字已提亮 |
-| 多提供商 × 多模型 | Drift + per-provider Key（secure） |
+| 多提供商 × 多模型 | Drift + per-provider Key；编辑页 **「测试连接」** |
 | 多网友 CRUD | Drift（权重 / 人设 / 模型绑定） |
 | 评论触发 | off / onBrowse / onOpenComments |
-| 评论区 UI | TikTok 式；**真 LLM**（`HttpLlmClient`）；无 Key 留空；Set 可「清除全部评论」；**乱码代码已修，真实端点重生成待验收 → §1.5** |
-| New | **真 Stream**；下拉刷新；空态；**无时间轨**（产品决策移除，筛选后置） |
-| 源主页 | 真文章；下拉刷新；more：刷新/暂停/复制/退订 |
-| 详情 | HTML/`contentText`；图缓存；打开原文/分享/复制/MD；**目录 scrubber**；dwell |
-| 已读 / 收藏 / 未读 | Drift `articles` 列 + Stream（杀进程仍在） |
-| ME | UI 齐；warm **Drift 持久化**（含 dwell/binge/streak/nightOwl） |
-| Set · RSS | 添加 URL / 列表 / 暂停删除 / OPML 粘贴导入 / 剪贴板导出 |
+| 评论区 UI | 真 LLM；无 Key 留空；clearAll；**HTTP 超时/429/5xx 重试**；D1 编码已修，**真机 0.0.2 验收中** |
+| New / 源 / 详情 | 真流；HTML；目录 scrubber；dwell |
+| ME | warm Drift + 温度规则 |
+| Set · RSS | 添加 / 列表 / OPML |
+| Set · 关于 | **PackageInfo 真版本**；检查更新 → GitHub Releases → **应用内下载安装**；协议/隐私外链；关于 → 仓库 |
+| Toast | `showAppToast`：浮动、短时、**抬高避开底栏** |
+| 发布 | MIT；`v0.0.1`/`v0.0.2` 已出分包 APK；CI 签名靠 Secrets |
 
 ### 1.3 明确未做 / 下一会话可选主路径
 
-**主线 A — 收口 Phase D 体验（建议优先，若真机评论仍烂）：** 见 §1.5  
+**用户正在真机测 0.0.2** —— 先收反馈，再按优先级捞。
 
-**Phase E 已接：**  
-- warm 规则 + Drift 持久化  
-- WorkManager / 本地通知 / `/article/:id`  
-
-**下一主线：**  
-- 评论任务持久化 + WorkManager 恢复（杀进程可靠）  
-- Android 厂商 ROM 后台长期验收与设置说明  
-- 应用内 WebView（Phase F / §15.6）  
-- New 筛选 UI；评论流式气泡  
+| 优先级 | 项 |
+|--------|-----|
+| 高 | 真机回归：返回 / Toast / 更新安装 / LLM 测连与评论可读（D1） |
+| 中 | 评论任务持久化 + WorkManager 恢复（杀进程可靠） |
+| 中 | 厂商 ROM 后台长期验收与 Set 说明文案 |
+| 低 | 评论流式气泡；New 筛选 UI；应用内 WebView（§15.6） |
+| 基建 | CI Actions Node 20 弃用告警可择机升 action 大版本 |
 
 ### 1.4 关键接线（勿重造）
 
@@ -116,27 +109,32 @@ test/
 | 删除源 | 硬删 feed + articles | 见 `DriftFeedRepository` 注释 |
 | Guid | guid → link → sha1(title\|published) | 刷新 upsert 不重复 |
 | 外链 | `openExternalUrl` → 系统浏览器 | WebView 见 §15.6 |
-| Scrubber | `EdgeScrubber` | **仅详情** h1–h3 目录；New **不挂**时间轨 |
-| LLM | `lib/data/llm/*` + `llmClientProvider` | 场景帧在 `llm_prompt.dart` |
-| 评论清空 | `CommentRepository.clearAll` / Set「清除全部评论」 | 清旧 mock 用 |
+| Scrubber | `EdgeScrubber` | **仅详情** h1–h3；New **不挂**时间轨 |
+| LLM | `http_llm_client` + `scheduled_llm_client` | 重试在 `_postJson`；测连**绕过** scheduler |
+| Toast | `lib/core/ui/app_toast.dart` + `appMessengerKey` | 勿再裸 `SnackBar` 贴底 |
+| 返回 | `AppShell` `PopScope` | 仅根 `/`；子路由正常 pop |
+| 更新 | `GithubUpdateService` + Set `_UpdateSheet` | 资产名 `wepseed-*-{abi}.apk` |
+| 链接常量 | `lib/core/config/app_links.dart` | TERMS/PRIVACY/API |
+| 签名 | `docs/SIGNING.private.md`（本地 only） | 勿提交 jks / key.properties |
+| 评论清空 | `CommentRepository.clearAll` | 清旧 mock / 脏串后重生成 |
 
-### 1.5 已知问题 / 技术债（2026-07-15 真机反馈 · **本会话不修，只登记**）
+### 1.5 已知问题 / 技术债（登记 · 0.0.2 真机测中）
 
-> 用户明确：问题还多但先歇，**只更文档**。下会话按优先级捞。
+> 下会话：**先听真机反馈**，再决定修债还是做任务持久化。
 
-| # | 现象 | 可能原因 | 建议方向（未实施） |
-|---|------|----------|-------------------|
-| D1 | **评论气泡正文乱码 / 方块 / 西里尔夹杂**（真机截图：顶层评与「冷淡叔」回复均不可读，夹 `DeepSeek`/`Codex`/`Bonsai` 等碎片） | 已定位：`response.body` 会受网关缺失/错误 charset 影响，在 JSON 解析前把 UTF-8 中文误解码 | **代码已修（2026-07-16）**：请求声明 UTF-8；响应统一从 `bodyBytes` 严格 `utf8.decode`；替换符/控制字符拒绝返回，避免脏串入库；回归测试已覆盖。仍需清旧评论后用真实端点重生成验收 |
-| D2 | Set 添加模型曾出现保存失败 | Dialog + 写后校验修复 | **已修并验收，不再跟踪** |
-| D3 | 无 Key 时旧逻辑会灌 **mock 评论** 占坑，清不掉就不重生成 | `ensureGenerated` 见 existing 即 return | **已改**：默认不灌 mock；Set「清除全部评论」；`kUseMockComments` 仅测试 |
-| D4 | 预设人设未说明「在 RSS 评论区当网友」 | systemHint 过短 | **已改**：`kWepseedCommentScene` 注入；seed 人设只写语气。**已装设备 seed 不覆盖**，需手改人设或清库 |
-| D5 | New 左侧时间轨侵入/卡顿/overflow | 按日刻度过多 | **已产品决策移除**；筛选后置；详情 TOC scrubber 保留 |
-| D6 | 评论生成过程曾是黑盒；失败文案混在气泡里 | 缺少任务状态 | **首轮已修**：显示排队/正在评论/正在回复；成功逐条入库；失败不再伪装成评论；空结果可重试；流式气泡后置 |
-| D7 | 网友显式绑定失效时曾回退到其他提供商 | `resolveLlmConfigForNetizen` 回退策略 | **已修**：显式绑定无效直接跳过，禁止静默消耗其他提供商额度；未绑定网友仍用首个可用提供商 |
+| # | 现象 | 状态 |
+|---|------|------|
+| D1 | 评论乱码 / 方块 / 西里尔 | **代码已修**（UTF-8 `bodyBytes` + 脏文本拒绝）；清评论后真端点重生成 — **0.0.2 待用户确认** |
+| D2 | 模型保存失败 | **已修已验收，关闭** |
+| D3–D7 | mock 占坑 / 场景帧 / 时间轨 / 状态 / 绑定回退 | **已改**（见历史行；D5 产品砍轨） |
+| F-back | 一点返回就退出 | **0.0.2 已修**（双击退出） |
+| F-toast | SnackBar 挡底栏 | **0.0.2 已修**（`showAppToast`） |
+| F-about | 关于 1.0.0 占位 | **0.0.2 已修**（真版本 + 更新/协议/GitHub） |
+| F-llm | 无重试 / 无测连 | **0.0.2 已修** |
+| E-ROM | 厂商杀后台 | **未做**长期验收 |
+| D-task | 评论生成杀进程丢任务 | **未做** WorkManager 恢复 |
 
-**与截图相关的验收口径（D1）：**  
-- 打开评论后，中文网友气泡应可读；出现 `` 成片或西里尔乱码 = **未验收通过**  
-- 清除该文评论或「清除全部评论」后重开，应重新请求而非永久脏数据  
+**D1 验收口径：** 清全部评论 → 真 Key 重开 → 中文可读、无成片 ``/西里尔 = 通过。  
 
 ---
 
@@ -706,6 +704,8 @@ preparing → queued → running → completed / failed
 - [x] D6 生成状态 / 完成提醒 / 空结果重试 / 失败不写伪气泡  
 - [x] 提供商共享并发 + RPM 队列；默认依次请求、逐条显示  
 - [x] 用户回复与 LLM 回复多层线程展示  
+- [x] HTTP 有限重试（超时 / 网络 / 429 / 5xx；401 不重试）  
+- [x] 提供商编辑 **测试连接**（独立 HttpLlmClient，不占评论队列）  
 - [ ]（可选）流式输出到评论气泡  
 - [ ] 持久化评论任务 + WorkManager 恢复（杀进程可靠后台）  
 
@@ -717,13 +717,18 @@ preparing → queued → running → completed / failed
 - [x] 通知权限、Wi‑Fi/unmetered 约束、周期设置热更新  
 - [ ] 厂商 ROM 后台长期实机验收  
 
-> 下一会话：优先评论任务持久化/杀进程恢复，或继续 Phase F 打磨。
+### Phase F — 打磨 ⚠ 部分已接（0.0.2）
 
-### Phase F — 打磨
-
-- [ ] 性能 / 错误空态 / 关于更新 / 测试补强  
+- [x] 根页返回拦截（双击退出）  
+- [x] 关于：真版本 / 检查更新（GitHub）/ 应用内下载安装 / 协议隐私外链 / 仓库入口  
+- [x] 统一低侵入 Toast  
+- [x] 开源 MIT + tag Release CI（per-ABI）+ 官方 Maven 优先  
+- [x] 测试：LLM 重试 · semver/ABI 选取（`test/semver_test.dart`）  
+- [ ] 性能 / 错误空态补强  
 - [ ] **应用内 WebView 阅读器**（见 §15.6）  
-- [ ] New 筛选 UI
+- [ ] New 筛选 UI  
+
+> 下一会话：先汇总 **0.0.2 真机反馈**；再评论任务杀进程恢复 / ROM 说明 / 剩余 F。
 
 ---
 
@@ -821,11 +826,13 @@ UI 只依赖接口；**Phase B 新增 `DriftFeedRepository` / `DriftArticleRepos
 - [x] EdgeScrubber（**仅详情**目录；New 无时间轨）  
 - [x] 深色正文对比度  
 
-### 更后
+### 更后 / 0.0.2
 
 - [x] 后台刷新 + 通知进文章（E）  
 - [x] ME warm 持久化 + 温度规则（E）  
-- [ ] 应用内 WebView（F） 
+- [x] 返回 / Toast / 关于更新安装 / LLM 重试·测连 / Release（F 一批）  
+- [ ] 应用内 WebView（F 余）  
+- [ ] 评论任务杀进程恢复  
 
 ---
 
@@ -859,51 +866,51 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.1 一句话
 
-**A–E 主路径已接。D 已有真 HTTP、严格 UTF-8、队列/RPM、任务状态与多层回复；E 已有 Warm Drift、温度规则、后台 RSS、本地通知和深链。下一步优先评论任务杀进程恢复或 Phase F。**
+**A–E 齐 + 0.0.2 已发（返回 / Toast / 关于·应用内更新 / LLM 重试·测连 / MIT · tag Release）。用户真机测 0.0.2；下一会话先收反馈，再做评论任务杀进程恢复或 F 余项。**
 
 ### 15.2 现状速查
 
 | 模块 | 路径 / 要点 |
 |------|-------------|
+| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag `v0.0.2` |
 | Flag | `kUseMockFeed=false`；`kUseMockComments=false` |
-| RSS | `lib/data/rss/*` · `drift_feed/article_repository.dart` |
-| DI | `lib/providers/core_providers.dart`（`llmClientProvider`） |
-| 正文 | `article_body.dart`：HTML + sanitize |
-| 目录 | `article_toc.dart` + 详情 `EdgeScrubber` |
-| New | `new_page.dart`：**无时间轨**；筛选后置 |
-| LLM HTTP | `lib/data/llm/http_llm_client.dart` |
-| LLM 队列 | `lib/data/llm/scheduled_llm_client.dart`：provider 共享并发/RPM |
-| LLM 场景/人设 | `llm_prompt.dart`（`kWepseedCommentScene`）· seed 在 `app_database._seedDefaults` |
-| 解析绑定 | `llm_resolve.dart` |
-| 模型 UI | `llm_settings_section.dart`：模型用 **Dialog**；提供商 sheet 内列表 |
-| 评论 | `comment_repository_impl.dart`：逐条入库；`comment_providers.dart`：生命周期/通知/去重 |
-| 外链 | `open_url.dart` 系统浏览器 |
-| Warm | `drift_warm_event_repository.dart`：持久化 + dwell/binge/streak/nightOwl |
-| 后台 | `core/background/background_refresh_service.dart` + `notification_service.dart` |
-| 测试 | `rss_parser` · `toc_extract` · `time_labels` · `llm_client` |
+| 版本 | `pubspec` `0.0.2+2`；Release CI 用 tag 覆盖 build-name/number |
+| RSS / DI | `lib/data/rss/*` · `core_providers.dart` |
+| 正文 / 目录 | `article_body` · 详情 `EdgeScrubber` only |
+| New | **无时间轨**；筛选后置 |
+| LLM HTTP | `http_llm_client.dart`：**3 次尝试**，超时/网络/429/5xx 重试 |
+| LLM 队列 | `scheduled_llm_client.dart` |
+| 测连 | `llm_settings_section`「测试连接」→ 裸 `HttpLlmClient` |
+| 评论 | `comment_repository_impl` + `comment_providers`（activity Toast） |
+| Toast | `core/ui/app_toast.dart` · `appMessengerKey` |
+| 返回 | `app_shell.dart` `PopScope` |
+| 更新 | `data/update/github_update_service.dart` · Set `_UpdateSheet` |
+| 链接 | `core/config/app_links.dart` · `docs/TERMS.md` · `docs/PRIVACY.md` |
+| Warm / 后台 | Drift warm · `background_refresh_service` · `notification_service` |
+| 签名私密 | `docs/SIGNING.private.md`（gitignore）· Secrets：`KEYSTORE_*` |
+| CI | `.github/workflows/release.yml` · **Maven：google/central 优先**，Aliyun 备用 |
+| 测试 | `llm_client`（含重试）· `semver_test` · rss/toc/warm/widget |
 | 债表 | **§1.5** |
 
 ### 15.3 下一会话建议顺序
 
-**若先收口 D（推荐）：**  
-1. 验收 D1：Set 清除全部旧评论 → 同一 DeepSeek/代理重新生成 → 确认中文可读且无方块/西里尔乱码  
-2. 验收队列：提供商并发 1、低 RPM；多网友应依次出现，额度耗尽后等待  
-3. 验收回复：回复任一网友评论 → 显示“正在回复你” → LLM 回复出现在该线程下  
-4. 决定是否进入持久化评论任务 + WorkManager（杀进程恢复）  
-
-**E 验收：**  
-1. 杀进程重开，ME/Warm 仍在  
-2. 通知开关关闭不弹；仅 Wi‑Fi 使用 unmetered 约束  
-3. 点击新文章通知进入 `/article/:id`  
-4. 国产 ROM 关闭省电限制后观察周期任务  
+1. **读用户 0.0.2 真机反馈**（返回、Toast、检查更新安装、测连、评论中文）  
+2. 未通过项：按 §1.5 定点修，优先 D1 若仍乱码  
+3. 通过后可选主线：  
+   - 评论任务持久化 + WorkManager 恢复  
+   - Set 厂商后台说明 + ROM 验收  
+   - 流式气泡 / New 筛选 / WebView（F）  
+4. 发版：`git tag vX.Y.Z && git push origin vX.Y.Z`（勿依赖 Aliyun 优先）
 
 ### 15.4 不要做的事
 
 - 恢复 New 左侧时间轨（除非产品改口）  
 - 无必要重写 masonry / 玻璃  
-- 应用内 WebView（F）  
+- 应用内 WebView（未明确开工前）  
 - 大改 RSS 解析（除非源坏了）  
-- 重做整套 LLM 协议（只修 bug / charset）
+- 重做整套 LLM 协议  
+- 提交 `*.jks` / `key.properties` / `SIGNING.private.md`  
+- 把 Gradle 再改回「Aliyun 优先」（会打挂 GitHub Actions）
 
 ### 15.5 启动命令
 
@@ -911,23 +918,21 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 cd D:\wepseed
 flutter pub get
 flutter analyze
-flutter test test/rss_parser_test.dart test/toc_extract_test.dart test/llm_client_test.dart
+flutter test
 flutter run -d <device>
+# 或装 Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.2
+# 首选 wepseed-0.0.2-arm64-v8a.apk
 ```
 
-### 15.6 Backlog：应用内 WebView 阅读器（Phase F）
+### 15.6 Backlog：应用内 WebView 阅读器（Phase F 余）
 
 **产品诉求（已确认）：** 外链优先应用内 WebView，可存 cookies、管理下载；成本高，**现阶段一律系统浏览器**。
 
 | 项 | 说明 |
 |----|------|
-| 包选型 | `webview_flutter`（Android/iOS）+ 桌面兜底外开；或 `flutter_inappwebview`（cookies/下载更全） |
-| Cookies | 持久化 CookieManager |
-| 下载 | Android 下载监听 → 通知 / 文件列表；iOS 受限更多 |
-| UI | 顶栏：返回 / 刷新 / 外开系统浏览器 / 分享；进度条 |
-| 入口 | 详情顶栏、正文 `<a>`、底部「打开原文」→ 应用内；保留「用系统浏览器」 |
-| 替换点 | 只改 `openExternalUrl` 或 `openArticleUrl(mode: inApp \| system)` |
-| 风险 | Windows 跨盘插件；桌面 UA；隐私文案 |
+| 包选型 | `webview_flutter` 或 `flutter_inappwebview` |
+| 替换点 | `openExternalUrl` / `openArticleUrl(mode: inApp \| system)` |
+| 风险 | 桌面 UA；隐私文案已部分在 `PRIVACY.md` |
 
 未实现前：**`LaunchMode.externalApplication` only**。
 
@@ -938,18 +943,20 @@ flutter run -d <device>
 | 进源页 | `markSourceSeen`：badge 清零 + 该源文章标已读 |
 | 删除源 | 硬删 feed + articles |
 | 外链 | 系统浏览器（WebView 后置） |
-| Scrubber | **仅详情目录**；右滑取消；≥2 锚点；**New 不挂时间轨**（侵入/卡顿，已砍） |
-| 评论 | 有 Key 真 LLM；**无 Key 不灌 mock**；`kUseMockComments` 仅测试；可 clearAll |
-| 人设 | 用户/seed 只写语气；**场景由 `kWepseedCommentScene` 注入** |
-| 深色正文 | 强制高对比；strip feed 内联灰色 |
+| Scrubber | **仅详情目录**；New **不挂时间轨** |
+| 评论 | 有 Key 真 LLM；**无 Key 不灌 mock**；可 clearAll |
+| 人设 | 只写语气；场景 `kWepseedCommentScene` |
+| 深色正文 | 强制高对比；strip 内联灰色 |
+| 根返回 | 先回 New，New 上双击退出 |
+| 更新 | GitHub Releases 分包 APK；优先 arm64-v8a |
+| 协议隐私 | 外链仓库 `docs/TERMS.md` / `PRIVACY.md` |
+| 开源 | MIT |
 
 ### 15.8 本会话变更摘要（便于 diff 记忆）
 
-- New：去掉月/日时间轨与 `EdgeScrubber`  
-- D：`HttpLlmClient` + `ensureGenerated` 真请求；prompt 场景帧；clearAll；模型 Dialog 保存路径加固  
-- D 1.5：提供商并发/RPM 队列；评论/回复状态；应用级完成提醒；递归回复树；D2 已验收  
-- E 1.6：Warm Drift；binge/streak/nightOwl；WorkManager RSS；本地通知与文章深链  
-- **未收口**：评论编码真实端点验收；评论任务杀进程恢复；厂商 ROM 后台长期验收；可选流式气泡  
+- **0.0.1**：首 tag Release；MIT；签名私密手册  
+- **0.0.2**：返回双击退出；`showAppToast`；关于真版本 + 检查更新下载安装；TERMS/PRIVACY；LLM 重试 + 测试连接；CI Maven 官方优先（修 Aliyun 502）  
+- **未收口**：0.0.2 真机全量验收；评论任务杀进程；ROM 后台；流式/筛选/WebView  
 
 ---
 
