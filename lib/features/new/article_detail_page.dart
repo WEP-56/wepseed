@@ -168,6 +168,15 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
     }
   }
 
+  /// 有下层栈则 pop；通知冷启/清栈时回壳，避免直接出应用。
+  void _leaveDetail(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final articleAsync = ref.watch(articleByIdProvider(widget.articleId));
@@ -178,11 +187,18 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
     final bottom = MediaQuery.paddingOf(context).bottom;
 
     if (article == null) {
-      return Scaffold(
-        body: Center(
-          child: Text(
-            articleAsync.isLoading ? '加载中…' : '内容不存在',
-            style: theme.textTheme.titleMedium,
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          _leaveDetail(context);
+        },
+        child: Scaffold(
+          body: Center(
+            child: Text(
+              articleAsync.isLoading ? '加载中…' : '内容不存在',
+              style: theme.textTheme.titleMedium,
+            ),
           ),
         ),
       );
@@ -201,102 +217,109 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
         : AppColors.textTertiaryLight;
     final hasToc = _tocEntries.length >= 2;
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              if (article.hasImage)
-                _CoverSliver(article: article, isDark: isDark)
-              else
-                SliverToBoxAdapter(child: SizedBox(height: top + 52)),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(hasToc ? 28 : 22, 8, 22, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          MonogramAvatar(
-                            label: article.source.name,
-                            size: 28,
-                            seed: article.source.id,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              article.source.name,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _leaveDetail(context);
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                if (article.hasImage)
+                  _CoverSliver(article: article, isDark: isDark)
+                else
+                  SliverToBoxAdapter(child: SizedBox(height: top + 52)),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(hasToc ? 28 : 22, 8, 22, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            MonogramAvatar(
+                              label: article.source.name,
+                              size: 28,
+                              seed: article.source.id,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                article.source.name,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
+                            Text(
+                              relativeTime(article.publishedAt),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: tertiaryText,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          article.title,
+                          style: theme.textTheme.displayMedium?.copyWith(
+                            fontSize: 26,
+                            height: 1.22,
+                            letterSpacing: -0.7,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? const Color(0xFFF5F5F5)
+                                : AppColors.textPrimaryLight,
                           ),
+                        ),
+                        if (article.showSummaryAsLead) ...[
+                          const SizedBox(height: 14),
                           Text(
-                            relativeTime(article.publishedAt),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: tertiaryText,
+                            article.summary,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: secondaryText,
+                              height: 1.55,
+                              fontSize: 15.5,
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 18),
-                      Text(
-                        article.title,
-                        style: theme.textTheme.displayMedium?.copyWith(
-                          fontSize: 26,
-                          height: 1.22,
-                          letterSpacing: -0.7,
-                          fontWeight: FontWeight.w700,
-                          color: isDark
-                              ? const Color(0xFFF5F5F5)
-                              : AppColors.textPrimaryLight,
-                        ),
-                      ),
-                      if (article.showSummaryAsLead) ...[
-                        const SizedBox(height: 14),
-                        Text(
-                          article.summary,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: secondaryText,
-                            height: 1.55,
-                            fontSize: 15.5,
-                          ),
-                        ),
-                      ],
-                      if (article.tags.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: article.tags
-                              .map(
-                                (t) => Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 9,
-                                    vertical: 5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? AppColors.inkCard
-                                        : AppColors.wash,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    t,
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      fontWeight: FontWeight.w500,
-                                      color: secondaryText,
+                        if (article.tags.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: article.tags
+                                .map(
+                                  (t) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 9,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? AppColors.inkCard
+                                          : AppColors.wash,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      t,
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w500,
+                                            color: secondaryText,
+                                          ),
                                     ),
                                   ),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ],
-                      const SizedBox(height: 22),
-                      Divider(
+                                )
+                                .toList(),
+                          ),
+                        ],
+                        const SizedBox(height: 22),
+                        Divider(
                         height: 0.5,
                         color: isDark
                             ? AppColors.dividerDark
@@ -330,7 +353,7 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
                 children: [
                   LiquidGlassIconButton(
                     icon: Icons.arrow_back_ios_new_rounded,
-                    onTap: () => context.pop(),
+                    onTap: () => _leaveDetail(context),
                   ),
                   const Spacer(),
                   LiquidGlassIconButton(
@@ -379,6 +402,7 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

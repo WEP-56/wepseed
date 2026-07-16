@@ -280,6 +280,59 @@ class Comment {
   bool get isTopLevel => parentId == null;
 }
 
+/// New 页信息流筛选（本地持久化）。
+///
+/// - [onlyToday] / [onlyUnread] 可叠加
+/// - [feedIds] 非空 = 只看这些源；空 = 不限源
+/// - 刷新限刷只看 [feedIds]（今日/未看不缩刷新范围）
+class FeedFilter {
+  const FeedFilter({
+    this.onlyToday = false,
+    this.onlyUnread = false,
+    this.feedIds = const {},
+  });
+
+  final bool onlyToday;
+  final bool onlyUnread;
+
+  /// Empty means all sources.
+  final Set<String> feedIds;
+
+  bool get isDefault => !onlyToday && !onlyUnread && feedIds.isEmpty;
+
+  bool get limitsRefresh => feedIds.isNotEmpty;
+
+  FeedFilter copyWith({
+    bool? onlyToday,
+    bool? onlyUnread,
+    Set<String>? feedIds,
+  }) {
+    return FeedFilter(
+      onlyToday: onlyToday ?? this.onlyToday,
+      onlyUnread: onlyUnread ?? this.onlyUnread,
+      feedIds: feedIds ?? this.feedIds,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! FeedFilter) return false;
+    if (onlyToday != other.onlyToday || onlyUnread != other.onlyUnread) {
+      return false;
+    }
+    if (feedIds.length != other.feedIds.length) return false;
+    return feedIds.containsAll(other.feedIds);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    onlyToday,
+    onlyUnread,
+    Object.hashAllUnordered(feedIds),
+  );
+}
+
 /// UX prefs. LLM endpoints live in LlmProvider / LlmModel.
 class AppSettings {
   const AppSettings({
@@ -290,6 +343,7 @@ class AppSettings {
     this.notificationsEnabled = true,
     this.useMockFeed = true,
     this.commentTrigger = CommentTrigger.onOpenComments,
+    this.feedFilter = const FeedFilter(),
   });
 
   final ThemeMode themeMode;
@@ -299,6 +353,7 @@ class AppSettings {
   final bool notificationsEnabled;
   final bool useMockFeed;
   final CommentTrigger commentTrigger;
+  final FeedFilter feedFilter;
 
   AppSettings copyWith({
     ThemeMode? themeMode,
@@ -308,6 +363,7 @@ class AppSettings {
     bool? notificationsEnabled,
     bool? useMockFeed,
     CommentTrigger? commentTrigger,
+    FeedFilter? feedFilter,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -317,6 +373,7 @@ class AppSettings {
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       useMockFeed: useMockFeed ?? this.useMockFeed,
       commentTrigger: commentTrigger ?? this.commentTrigger,
+      feedFilter: feedFilter ?? this.feedFilter,
     );
   }
 }

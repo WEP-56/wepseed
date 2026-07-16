@@ -36,8 +36,11 @@ class FeedActions {
 
   Future<void> refreshFeed(String id) => _repo.refreshFeed(id);
 
-  Future<void> refreshAll({bool wifiOnly = false}) =>
-      _repo.refreshAll(wifiOnly: wifiOnly);
+  Future<void> refreshAll({
+    bool wifiOnly = false,
+    Iterable<String>? feedIds,
+  }) =>
+      _repo.refreshAll(wifiOnly: wifiOnly, feedIds: feedIds);
 
   Future<void> importOpml(String xml) => _repo.importOpml(xml);
 

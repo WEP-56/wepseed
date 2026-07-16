@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 
@@ -72,6 +74,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
         notificationsEnabled: Value(settings.notificationsEnabled),
         useMockFeed: Value(settings.useMockFeed),
         commentTrigger: Value(commentTriggerToDb(settings.commentTrigger)),
+        feedFilterJson: Value(feedFilterToDb(settings.feedFilter)),
         updatedAt: Value(DateTime.now()),
       ),
     );
@@ -117,6 +120,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       notificationsEnabled: row.notificationsEnabled,
       useMockFeed: row.useMockFeed,
       commentTrigger: commentTriggerFromDb(row.commentTrigger),
+      feedFilter: feedFilterFromDb(row.feedFilterJson),
     );
   }
 
@@ -131,4 +135,40 @@ class SettingsRepositoryImpl implements SettingsRepository {
         'dark' => ThemeMode.dark,
         _ => ThemeMode.system,
       };
+}
+
+String feedFilterToDb(FeedFilter filter) {
+  final ids = filter.feedIds.toList()..sort();
+  return jsonEncode({
+    'onlyToday': filter.onlyToday,
+    'onlyUnread': filter.onlyUnread,
+    'feedIds': ids,
+  });
+}
+
+FeedFilter feedFilterFromDb(String raw) {
+  if (raw.trim().isEmpty || raw.trim() == '{}') {
+    return const FeedFilter();
+  }
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return const FeedFilter();
+    final map = Map<String, dynamic>.from(decoded);
+    final onlyToday = map['onlyToday'] == true;
+    final onlyUnread = map['onlyUnread'] == true;
+    final rawIds = map['feedIds'];
+    final ids = <String>{};
+    if (rawIds is List) {
+      for (final id in rawIds) {
+        if (id is String && id.isNotEmpty) ids.add(id);
+      }
+    }
+    return FeedFilter(
+      onlyToday: onlyToday,
+      onlyUnread: onlyUnread,
+      feedIds: ids,
+    );
+  } catch (_) {
+    return const FeedFilter();
+  }
 }

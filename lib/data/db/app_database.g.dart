@@ -3657,6 +3657,18 @@ class $AppSettingsRowsTable extends AppSettingsRows
     requiredDuringInsert: false,
     defaultValue: const Constant('onOpenComments'),
   );
+  static const VerificationMeta _feedFilterJsonMeta = const VerificationMeta(
+    'feedFilterJson',
+  );
+  @override
+  late final GeneratedColumn<String> feedFilterJson = GeneratedColumn<String>(
+    'feed_filter_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -3680,6 +3692,7 @@ class $AppSettingsRowsTable extends AppSettingsRows
     llmModel,
     useMockFeed,
     commentTrigger,
+    feedFilterJson,
     updatedAt,
   ];
   @override
@@ -3768,6 +3781,15 @@ class $AppSettingsRowsTable extends AppSettingsRows
         ),
       );
     }
+    if (data.containsKey('feed_filter_json')) {
+      context.handle(
+        _feedFilterJsonMeta,
+        feedFilterJson.isAcceptableOrUnknown(
+          data['feed_filter_json']!,
+          _feedFilterJsonMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -3825,6 +3847,10 @@ class $AppSettingsRowsTable extends AppSettingsRows
         DriftSqlType.string,
         data['${effectivePrefix}comment_trigger'],
       )!,
+      feedFilterJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}feed_filter_json'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -3849,6 +3875,9 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
   final String llmModel;
   final bool useMockFeed;
   final String commentTrigger;
+
+  /// New-page stream filter JSON: {onlyToday, onlyUnread, feedIds}.
+  final String feedFilterJson;
   final DateTime updatedAt;
   const AppSettingsRow({
     required this.id,
@@ -3861,6 +3890,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
     required this.llmModel,
     required this.useMockFeed,
     required this.commentTrigger,
+    required this.feedFilterJson,
     required this.updatedAt,
   });
   @override
@@ -3876,6 +3906,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
     map['llm_model'] = Variable<String>(llmModel);
     map['use_mock_feed'] = Variable<bool>(useMockFeed);
     map['comment_trigger'] = Variable<String>(commentTrigger);
+    map['feed_filter_json'] = Variable<String>(feedFilterJson);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -3892,6 +3923,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
       llmModel: Value(llmModel),
       useMockFeed: Value(useMockFeed),
       commentTrigger: Value(commentTrigger),
+      feedFilterJson: Value(feedFilterJson),
       updatedAt: Value(updatedAt),
     );
   }
@@ -3914,6 +3946,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
       llmModel: serializer.fromJson<String>(json['llmModel']),
       useMockFeed: serializer.fromJson<bool>(json['useMockFeed']),
       commentTrigger: serializer.fromJson<String>(json['commentTrigger']),
+      feedFilterJson: serializer.fromJson<String>(json['feedFilterJson']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -3931,6 +3964,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
       'llmModel': serializer.toJson<String>(llmModel),
       'useMockFeed': serializer.toJson<bool>(useMockFeed),
       'commentTrigger': serializer.toJson<String>(commentTrigger),
+      'feedFilterJson': serializer.toJson<String>(feedFilterJson),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -3946,6 +3980,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
     String? llmModel,
     bool? useMockFeed,
     String? commentTrigger,
+    String? feedFilterJson,
     DateTime? updatedAt,
   }) => AppSettingsRow(
     id: id ?? this.id,
@@ -3958,6 +3993,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
     llmModel: llmModel ?? this.llmModel,
     useMockFeed: useMockFeed ?? this.useMockFeed,
     commentTrigger: commentTrigger ?? this.commentTrigger,
+    feedFilterJson: feedFilterJson ?? this.feedFilterJson,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   AppSettingsRow copyWithCompanion(AppSettingsRowsCompanion data) {
@@ -3982,6 +4018,9 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
       commentTrigger: data.commentTrigger.present
           ? data.commentTrigger.value
           : this.commentTrigger,
+      feedFilterJson: data.feedFilterJson.present
+          ? data.feedFilterJson.value
+          : this.feedFilterJson,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -3999,6 +4038,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
           ..write('llmModel: $llmModel, ')
           ..write('useMockFeed: $useMockFeed, ')
           ..write('commentTrigger: $commentTrigger, ')
+          ..write('feedFilterJson: $feedFilterJson, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -4016,6 +4056,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
     llmModel,
     useMockFeed,
     commentTrigger,
+    feedFilterJson,
     updatedAt,
   );
   @override
@@ -4032,6 +4073,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
           other.llmModel == this.llmModel &&
           other.useMockFeed == this.useMockFeed &&
           other.commentTrigger == this.commentTrigger &&
+          other.feedFilterJson == this.feedFilterJson &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -4046,6 +4088,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
   final Value<String> llmModel;
   final Value<bool> useMockFeed;
   final Value<String> commentTrigger;
+  final Value<String> feedFilterJson;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const AppSettingsRowsCompanion({
@@ -4059,6 +4102,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
     this.llmModel = const Value.absent(),
     this.useMockFeed = const Value.absent(),
     this.commentTrigger = const Value.absent(),
+    this.feedFilterJson = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4073,6 +4117,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
     this.llmModel = const Value.absent(),
     this.useMockFeed = const Value.absent(),
     this.commentTrigger = const Value.absent(),
+    this.feedFilterJson = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -4088,6 +4133,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
     Expression<String>? llmModel,
     Expression<bool>? useMockFeed,
     Expression<String>? commentTrigger,
+    Expression<String>? feedFilterJson,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -4103,6 +4149,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
       if (llmModel != null) 'llm_model': llmModel,
       if (useMockFeed != null) 'use_mock_feed': useMockFeed,
       if (commentTrigger != null) 'comment_trigger': commentTrigger,
+      if (feedFilterJson != null) 'feed_filter_json': feedFilterJson,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4119,6 +4166,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
     Value<String>? llmModel,
     Value<bool>? useMockFeed,
     Value<String>? commentTrigger,
+    Value<String>? feedFilterJson,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -4133,6 +4181,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
       llmModel: llmModel ?? this.llmModel,
       useMockFeed: useMockFeed ?? this.useMockFeed,
       commentTrigger: commentTrigger ?? this.commentTrigger,
+      feedFilterJson: feedFilterJson ?? this.feedFilterJson,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -4171,6 +4220,9 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
     if (commentTrigger.present) {
       map['comment_trigger'] = Variable<String>(commentTrigger.value);
     }
+    if (feedFilterJson.present) {
+      map['feed_filter_json'] = Variable<String>(feedFilterJson.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -4193,6 +4245,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
           ..write('llmModel: $llmModel, ')
           ..write('useMockFeed: $useMockFeed, ')
           ..write('commentTrigger: $commentTrigger, ')
+          ..write('feedFilterJson: $feedFilterJson, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -8665,6 +8718,7 @@ typedef $$AppSettingsRowsTableCreateCompanionBuilder =
       Value<String> llmModel,
       Value<bool> useMockFeed,
       Value<String> commentTrigger,
+      Value<String> feedFilterJson,
       required DateTime updatedAt,
       Value<int> rowid,
     });
@@ -8680,6 +8734,7 @@ typedef $$AppSettingsRowsTableUpdateCompanionBuilder =
       Value<String> llmModel,
       Value<bool> useMockFeed,
       Value<String> commentTrigger,
+      Value<String> feedFilterJson,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -8740,6 +8795,11 @@ class $$AppSettingsRowsTableFilterComposer
 
   ColumnFilters<String> get commentTrigger => $composableBuilder(
     column: $table.commentTrigger,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get feedFilterJson => $composableBuilder(
+    column: $table.feedFilterJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8808,6 +8868,11 @@ class $$AppSettingsRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get feedFilterJson => $composableBuilder(
+    column: $table.feedFilterJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -8863,6 +8928,11 @@ class $$AppSettingsRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get feedFilterJson => $composableBuilder(
+    column: $table.feedFilterJson,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
@@ -8914,6 +8984,7 @@ class $$AppSettingsRowsTableTableManager
                 Value<String> llmModel = const Value.absent(),
                 Value<bool> useMockFeed = const Value.absent(),
                 Value<String> commentTrigger = const Value.absent(),
+                Value<String> feedFilterJson = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AppSettingsRowsCompanion(
@@ -8927,6 +8998,7 @@ class $$AppSettingsRowsTableTableManager
                 llmModel: llmModel,
                 useMockFeed: useMockFeed,
                 commentTrigger: commentTrigger,
+                feedFilterJson: feedFilterJson,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -8942,6 +9014,7 @@ class $$AppSettingsRowsTableTableManager
                 Value<String> llmModel = const Value.absent(),
                 Value<bool> useMockFeed = const Value.absent(),
                 Value<String> commentTrigger = const Value.absent(),
+                Value<String> feedFilterJson = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => AppSettingsRowsCompanion.insert(
@@ -8955,6 +9028,7 @@ class $$AppSettingsRowsTableTableManager
                 llmModel: llmModel,
                 useMockFeed: useMockFeed,
                 commentTrigger: commentTrigger,
+                feedFilterJson: feedFilterJson,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

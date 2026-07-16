@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/background/background_refresh_service.dart';
@@ -11,6 +12,16 @@ import 'data/models/models.dart';
 import 'providers/comment_providers.dart';
 import 'providers/settings_provider.dart';
 import 'router/app_router.dart';
+
+/// 通知 / Toast 深链：push 到现有栈上，避免 go 清栈后返回直接回桌面。
+void _openDeepLink(GoRouter router, String route) {
+  final target = Uri.parse(route);
+  final current = router.state.uri;
+  if (current.path == target.path && current.query == target.query) {
+    return;
+  }
+  router.push(route);
+}
 
 class WepseedApp extends ConsumerWidget {
   const WepseedApp({super.key});
@@ -29,7 +40,10 @@ class WepseedApp extends ConsumerWidget {
     });
     ref.listen(notificationRouteProvider, (previous, next) {
       final route = next.value;
-      if (route != null && route != previous?.value) router.go(route);
+      if (route == null) return;
+      // push 保留下层栈；go 会整栈替换成仅详情，返回直接出应用。
+      // 同 path 去重在 _openDeepLink；勿用 previous?.value（Stream 可能连发同文）。
+      _openDeepLink(router, route);
     });
 
     ref.listen(commentActivityProvider, (previous, next) {
@@ -50,7 +64,8 @@ class WepseedApp extends ConsumerWidget {
                 ? null
                 : SnackBarAction(
                     label: '查看',
-                    onPressed: () => router.go(
+                    onPressed: () => _openDeepLink(
+                      router,
                       '/article/${Uri.encodeComponent(entry.key)}?comments=1',
                     ),
                   ),

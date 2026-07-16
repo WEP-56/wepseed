@@ -168,7 +168,13 @@ class _SourceFeedPageState extends ConsumerState<SourceFeedPage> {
                   children: [
                     LiquidGlassIconButton(
                       icon: Icons.arrow_back_ios_new_rounded,
-                      onTap: () => context.pop(),
+                      onTap: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/');
+                        }
+                      },
                     ),
                     const Spacer(),
                     LiquidGlassIconButton(

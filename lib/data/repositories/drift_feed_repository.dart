@@ -106,11 +106,18 @@ class DriftFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<void> refreshAll({bool wifiOnly = false}) async {
+  Future<void> refreshAll({
+    bool wifiOnly = false,
+    Iterable<String>? feedIds,
+  }) async {
     // wifiOnly is honored by background worker (Phase E); UI refresh ignores it.
-    final rows = await (_db.select(_db.feeds)
-          ..where((t) => t.isPaused.equals(false)))
-        .get();
+    final scoped = feedIds?.where((id) => id.isNotEmpty).toSet();
+    final query = _db.select(_db.feeds)
+      ..where((t) => t.isPaused.equals(false));
+    if (scoped != null && scoped.isNotEmpty) {
+      query.where((t) => t.id.isIn(scoped));
+    }
+    final rows = await query.get();
     for (final row in rows) {
       try {
         await _refreshRow(row);

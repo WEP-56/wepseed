@@ -25,7 +25,11 @@ void backgroundCallbackDispatcher() {
       final beforeRows = await db.select(db.articles).get();
       final beforeIds = beforeRows.map((row) => row.id).toSet();
 
-      await feeds.refreshAll(wifiOnly: settings.wifiOnly);
+      final filterIds = settings.feedFilter.feedIds;
+      await feeds.refreshAll(
+        wifiOnly: settings.wifiOnly,
+        feedIds: filterIds.isEmpty ? null : filterIds,
+      );
 
       if (settings.notificationsEnabled) {
         final query = db.select(db.articles).join([

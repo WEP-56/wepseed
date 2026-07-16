@@ -135,6 +135,9 @@ class AppSettingsRows extends Table {
   BoolColumn get useMockFeed => boolean().withDefault(const Constant(true))();
   TextColumn get commentTrigger =>
       text().withDefault(const Constant('onOpenComments'))();
+  /// New-page stream filter JSON: {onlyToday, onlyUnread, feedIds}.
+  TextColumn get feedFilterJson =>
+      text().withDefault(const Constant('{}'))();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override

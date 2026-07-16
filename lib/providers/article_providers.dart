@@ -1,11 +1,27 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/utils/feed_filter.dart';
 import '../data/models/models.dart';
 import '../data/repositories/article_repository.dart';
 import 'core_providers.dart';
+import 'settings_provider.dart';
 
 final articlesProvider = StreamProvider<List<Article>>((ref) {
   return ref.watch(articleRepositoryProvider).watchTimeline();
+});
+
+final feedFilterProvider = Provider<FeedFilter>((ref) {
+  return ref.watch(settingsProvider).value?.feedFilter ?? const FeedFilter();
+});
+
+/// New-page timeline with persisted [FeedFilter] applied.
+final filteredArticlesProvider = Provider<AsyncValue<List<Article>>>((ref) {
+  final articles = ref.watch(articlesProvider);
+  final filter = ref.watch(feedFilterProvider);
+  final readIds = ref.watch(readIdsProvider).value ?? const <String>{};
+  return articles.whenData(
+    (list) => applyFeedFilter(list, filter: filter, readIds: readIds),
+  );
 });
 
 final articlesByFeedProvider =

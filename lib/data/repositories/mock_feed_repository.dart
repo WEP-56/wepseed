@@ -46,7 +46,10 @@ class MockFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<void> refreshAll({bool wifiOnly = false}) async {
+  Future<void> refreshAll({
+    bool wifiOnly = false,
+    Iterable<String>? feedIds,
+  }) async {
     // no-op in mock
   }
 
