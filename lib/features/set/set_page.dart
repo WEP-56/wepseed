@@ -111,7 +111,7 @@ class SetPage extends ConsumerWidget {
             _NavTile(
               icon: Icons.sync_rounded,
               title: '刷新频率',
-              subtitle: '每 ${settings.refreshMinutes} 分钟',
+              subtitle: '后台每 ${settings.refreshMinutes} 分钟（系统最短约 15 分）',
               onTap: () => _openRefresh(context, controller, settings),
             ),
           ],
@@ -126,7 +126,7 @@ class SetPage extends ConsumerWidget {
             _SwitchTile(
               icon: Icons.notifications_none_rounded,
               title: '更新通知',
-              subtitle: '有新文章时提醒',
+              subtitle: '后台刷到新文时本地提醒',
               value: settings.notificationsEnabled,
               onChanged: (v) {
                 controller.updateSettings(
@@ -137,11 +137,20 @@ class SetPage extends ConsumerWidget {
             _SwitchTile(
               icon: Icons.wifi_rounded,
               title: '仅 Wi-Fi 刷新',
-              subtitle: '后台拉取节省流量',
+              subtitle: '后台拉源仅走 Wi‑Fi',
               value: settings.wifiOnly,
               onChanged: (v) {
                 controller.updateSettings(settings.copyWith(wifiOnly: v));
               },
+            ),
+            _NavTile(
+              icon: Icons.battery_saver_outlined,
+              title: '后台被杀？',
+              subtitle: '允许自启动 / 无限制电池，周期刷新才稳',
+              onTap: () => showAppToast(
+                '请在系统设置中允许 WEPSEED 后台运行、自启动与通知权限',
+                context: context,
+              ),
             ),
             _NavTile(
               icon: Icons.cleaning_services_outlined,

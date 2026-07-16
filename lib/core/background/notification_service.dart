@@ -8,6 +8,9 @@ final notificationRouteProvider = StreamProvider<String>((ref) {
   return NotificationService.instance.routes;
 });
 
+/// Shared channel id — must match [AndroidNotificationDetails.channelId].
+const kRssNotificationChannelId = 'rss_updates';
+
 class NotificationService {
   NotificationService._();
 
@@ -42,6 +45,21 @@ class NotificationService {
         }
       },
     );
+
+    // Create channel before any background isolate posts (Android 8+).
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await android?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        kRssNotificationChannelId,
+        '订阅更新',
+        description: '新文章与订阅源更新',
+        importance: Importance.defaultImportance,
+      ),
+    );
+
     final launch = await _plugin.getNotificationAppLaunchDetails();
     if (launch?.didNotificationLaunchApp ?? false) {
       final payload = launch?.notificationResponse?.payload;
@@ -75,7 +93,7 @@ class NotificationService {
       body: title,
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
-          'rss_updates',
+          kRssNotificationChannelId,
           '订阅更新',
           channelDescription: '新文章与订阅源更新',
           importance: Importance.defaultImportance,

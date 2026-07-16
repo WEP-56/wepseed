@@ -1,8 +1,8 @@
 # WEPSEED 功能实现文档
 
-> 版本：**0.0.3**（tag `v0.0.3` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
+> 版本：**0.0.4**（tag `v0.0.4` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
 > 平台：Flutter · Android 首发 · 本地优先（local-only）  
-> 状态：**0.0.3 已发**（通知返回栈 + New 筛选）；本轮代码合入无问题；**待真机装 Release 回归**  
+> 状态：**0.0.4**：评论去思考/tool 泄漏；ME 收藏/对话/痕迹可点列表（增删查改）；RSS WM 加固；待真机综合测  
 > 开关：`kUseMockFeed` / `kUseMockComments`（`lib/core/config/app_flags.dart`）
 
 本文档只写**要做什么、做成什么样、怎么落地**。  
@@ -30,10 +30,10 @@
 | 订阅 | 添加源、OPML 导入/导出、刷新 | **已接真**（Set + 源页） |
 | 刷 | New masonry 流 + 源主页 | **真 Stream + 下拉刷新**（时间轨已移除；**筛选已接**） |
 | 读 | 详情正文、已读、收藏 | **HTML 正文 + 图缓存 + 目录 scrubber**；外链系统浏览器 |
-| 评 | TikTok 式评论区 + 多网友 | **配置真 + 内容真 LLM**（无 Key **不灌 mock**；见 §1.5 乱码/模型保存） |
+| 评 | TikTok 式评论区 + 多网友 | **配置真 + 内容真 LLM**（无 Key **不灌 mock**；D1 编码真机通过；**D-task 未做**） |
 | 回看 | ME 时间轴 | **Drift 持久化**；dwell/binge/streak/nightOwl 规则已接 |
 | 设 | 形象、主题、字号、多提供商/网友、DATA、关于 | **大部分真持久化**；关于 = 真版本 + GitHub 更新/协议 |
-| 推 | WorkManager + 本地通知 | **已接 Android 周期刷新 + 新文章通知 + 文章深链** |
+| 推 | WorkManager + 本地通知 | **已接 + 加固**：冷启动重排程、后台 isolate 插件注册、通知 channel、杀进程仍周期刷源+通知（OEM 另见 E-ROM） |
 | 发 | tag 驱动 Release | **已接** per-ABI APK + GitHub Actions（`v*`） |
 
 ---
@@ -81,24 +81,24 @@ test/
 | 多提供商 × 多模型 | Drift + per-provider Key；编辑页 **「测试连接」** |
 | 多网友 CRUD | Drift（权重 / 人设 / 模型绑定） |
 | 评论触发 | off / onBrowse / onOpenComments |
-| 评论区 UI | 真 LLM；无 Key 留空；clearAll；**HTTP 超时/429/5xx 重试**；D1 编码已修，**真机待确认** |
+| 评论区 UI | 真 LLM；无 Key 留空；clearAll；**HTTP 超时/429/5xx 重试**；D1 中文 **真机通过** |
 | New / 源 / 详情 | 真流；**筛选**（今日/未看/多源 + 持久化 + 选源限刷）；HTML；目录 scrubber；dwell |
-| 通知深链 | payload `/article/:id`；**`router.push`**（勿 go）；详情/源 `canPop` 兜底 `go('/')` |
+| 通知深链 | payload `/article/:id`；**`router.push`**（勿 go）；详情/源 `canPop` 兜底 `go('/')`；**真机返回栈通过** |
 | ME | warm Drift + 温度规则 |
 | Set · RSS | 添加 / 列表 / OPML |
 | Set · 关于 | **PackageInfo 真版本**；检查更新 → GitHub Releases → **应用内下载安装**；协议/隐私外链；关于 → 仓库 |
 | Toast | `showAppToast`：浮动、短时、**抬高避开底栏** |
 | 发布 | MIT；`v0.0.1`–`v0.0.3` 分包 APK；CI 签名靠 Secrets |
 
-### 1.3 明确未做 / 下一会话可选主路径
+### 1.3 明确未做 / 下一会话主路径
 
-**0.0.3 代码已合入**（本轮：F-notif-back + F-filter 无问题）。下一会话优先 **真机装 `v0.0.3` APK 回归**，再开新功能。
+**0.0.3 真机回归已通过**。**RSS 杀后台仍通知**依赖 WorkManager 周期任务（已加固，见 §4.8 / §1.4）。  
+**D-task（评论生成）仍未实现**，与 RSS 后台是两条线。
 
 | 优先级 | 项 |
 |--------|-----|
-| 高 | 真机：通知进帖返回栈 · New 筛选 · Toast · 更新安装 · LLM 测连 · D1 评论中文 |
-| 中 | 评论任务持久化 + WorkManager 恢复（杀进程可靠） |
-| 中 | 厂商 ROM 后台长期验收与 Set 说明文案 |
+| **高** | **E-ROM 用户测**：杀后台后 RSS 周期刷新 + 新文通知是否到达（配合系统自启动/电池） |
+| 中 | **D-task**：评论生成任务持久化 + WorkManager 恢复（杀进程可靠）— 与 RSS 独立 |
 | 低 | 评论流式气泡；应用内 WebView（§15.6） |
 | 基建 | CI Actions Node 20 弃用告警可择机升 action 大版本 |
 
@@ -115,31 +115,44 @@ test/
 | Toast | `lib/core/ui/app_toast.dart` + `appMessengerKey` | 勿再裸 `SnackBar` 贴底 |
 | 返回 | `AppShell` `PopScope` | 仅根 `/`；子路由正常 pop |
 | 通知深链 | `app.dart` `_openDeepLink` → **`router.push`** | **勿用 `go`**：会清栈，返回直接回桌面 |
+| RSS 后台 | `BackgroundRefreshService` + `runRssRefreshJob` | **冷启动** `scheduleFromDatabase`；isolate 内 **`DartPluginRegistrant`**；**勿** `requiresBatteryNotLow`；通知 channel 先建 |
 | New 筛选 | `FeedFilter` + `filteredArticlesProvider` | Drift `feedFilterJson`；今日∩未看∩源；**选源才限刷** |
 | 更新 | `GithubUpdateService` + Set `_UpdateSheet` | 资产名 `wepseed-*-{abi}.apk` |
 | 链接常量 | `lib/core/config/app_links.dart` | TERMS/PRIVACY/API |
 | 签名 | `docs/SIGNING.private.md`（本地 only） | 勿提交 jks / key.properties |
 | 评论清空 | `CommentRepository.clearAll` | 清旧 mock / 脏串后重生成 |
 
-### 1.5 已知问题 / 技术债（登记 · 0.0.3）
+### 1.5 已知问题 / 技术债（登记 · 0.0.3 真机后）
 
-> 下会话：**先装 `v0.0.3` 真机回归**；无阻塞再开 D-task / ROM / F 余。
+> 下会话：**直接开 D-task**；ROM 真机验收排在 D-task 之后。
 
 | # | 现象 | 状态 |
 |---|------|------|
-| D1 | 评论乱码 / 方块 / 西里尔 | **代码已修**（UTF-8 `bodyBytes` + 脏文本拒绝）；清评论后真端点重生成 — **仍待真机确认** |
+| D1 | 评论乱码 / 方块 / 西里尔 | **关闭**（代码 UTF-8 + 脏文本拒绝；**真机通过**） |
 | D2 | 模型保存失败 | **已修已验收，关闭** |
 | D3–D7 | mock 占坑 / 场景帧 / 时间轨 / 状态 / 绑定回退 | **已改**（见历史行；D5 产品砍轨） |
 | F-back | 一点返回就退出 | **0.0.2 已修**（双击退出） |
-| F-notif-back | 通知/小 Toast「查看」进帖返回直接回桌面 | **0.0.3 代码已合**（`go`→`push` + `_leaveDetail`）；**待真机确认** |
-| F-filter | New 筛选 | **0.0.3 代码已合**（今日/未看/多源 + 持久化 + 选源限刷）；**待真机确认** |
-| F-toast | SnackBar 挡底栏 | **0.0.2 已修**（`showAppToast`） |
-| F-about | 关于 1.0.0 占位 | **0.0.2 已修**（真版本 + 更新/协议/GitHub） |
-| F-llm | 无重试 / 无测连 | **0.0.2 已修** |
-| E-ROM | 厂商杀后台 | **未做**长期验收 |
-| D-task | 评论生成杀进程丢任务 | **未做** WorkManager 恢复 |
+| F-notif-back | 通知/小 Toast「查看」进帖返回直接回桌面 | **关闭**（`push` + `_leaveDetail`；**真机通过**） |
+| F-filter | New 筛选 | **关闭**（今日/未看/多源 + 持久化 + 选源限刷；**真机通过**） |
+| F-toast | SnackBar 挡底栏 | **0.0.2 已修**（`showAppToast`；真机通过） |
+| F-about | 关于 1.0.0 占位 | **0.0.2 已修**（真版本 + 更新/协议/GitHub；真机通过） |
+| F-llm | 无重试 / 无测连 | **0.0.2 已修**（真机通过） |
+| **D-task** | 评论生成杀进程丢任务 | **未做**（内存 Future；与 RSS WM **无关**） |
+| E-ROM | 厂商杀后台影响 **RSS 周期任务** | Set 已加「后台被杀？」提示；**待用户真机长期验** |
 
-**D1 验收口径：** 清全部评论 → 真 Key 重开 → 中文可读、无成片 ``/西里尔 = 通过。  
+**RSS 后台（杀进程仍通知）— 已加固（本会话）：**
+
+| 点 | 做法 |
+|----|------|
+| 冷启动重排程 | `main` → `BackgroundRefreshService.scheduleFromDatabase()` |
+| 后台 isolate 插件 | `DartPluginRegistrant.ensureInitialized()` + 独立 `AppDatabase` |
+| 通知 channel | 前台/后台 `initialize` 均 `createNotificationChannel` |
+| 约束 | 仅 network（wifiOnly→unmetered）；**去掉** `requiresBatteryNotLow` |
+| 关通知开关 | 仍周期拉源；**不** post 本地通知 |
+| 任务名 | `wepseed.periodic-rss-refresh` / `wepseed.refresh-feeds` |
+| OEM 边界 | 强制停止 / 超激进省电仍可能停 WM，需用户放行自启动 |
+
+**D-task 代码核查（评论，未做）：** 无 `comment_jobs`；`CommentController` 内存 Future；WM dispatcher 仅 RSS task。  
 
 ---
 
@@ -484,15 +497,18 @@ warm_events     id, type, title, subtitle, articleId?, …
 - `workmanager`：周期拉 feed  
 - `flutter_local_notifications`：本地通知  
 
-**当前实现（Android）**
+**当前实现（Android · 杀进程可刷源通知）**
 
-- 设置变化时以 `ExistingPeriodicWorkPolicy.update` 更新唯一周期任务；最短 15 分钟
-- `wifiOnly=true` → `NetworkType.unmetered`；否则 `connected`；同时要求电量非低
-- 后台 isolate 独立打开 Drift，刷新全部未暂停源；以刷新前后的 article id 差集识别真正新增文章
-- 单轮最多通知最新 3 篇，避免通知轰炸；通知 payload 为 `/article/:id`
-- Android 13+ 在通知开启时请求 `POST_NOTIFICATIONS`
-- **导航**：`notificationRouteProvider` / 评论 Toast「查看」一律 **`router.push`**（`app.dart` `_openDeepLink`），保留下层栈；同 path 不重复 push
-- 详情/源页返回：`canPop` 则 pop，否则 `go('/')`（冷启异常清栈兜底，避免出应用）
+- **冷启动**：`main` 调 `scheduleFromDatabase()`（读 Drift 设置并 `registerPeriodicTask`）；设置变更时 `configure` 再 update
+- 最短周期 **15 分钟**（Android WM 下限）；`ExistingPeriodicWorkPolicy.update`
+- `wifiOnly=true` → `NetworkType.unmetered`；否则 `connected`；**不**要求电量非低
+- 后台 isolate：`DartPluginRegistrant` → 独立 Drift → `refreshAll`（选源限刷同 New 筛选 `feedIds`）
+- 刷新前后 article id 差集 = 新文；最多通知 **3** 篇；payload `/article/:id`
+- 通知 channel `rss_updates` 在 `NotificationService.initialize` **显式创建**（后台 isolate 同样走 initialize）
+- 关「更新通知」：仍拉源，不 post
+- Android 13+：开通知时 `requestNotificationsPermission`
+- **导航**：深链 **`router.push`**；详情/源 `canPop`? pop : `go('/')`
+- Set · DATA：「后台被杀？」提示用户开自启动/电池无限制
 
 **通知文案**
 
@@ -509,8 +525,9 @@ warm_events     id, type, title, subtitle, articleId?, …
 - [x] 开关关闭后不弹  
 - [x] 仅 Wi‑Fi 映射为 unmetered 后台约束  
 - [x] 点击通知进对应文章  
-- [ ] **通知进帖 → 系统返回 / 顶栏返回 → 回到进通知前界面**（热启动）；冷启至少回壳 `/`  
-- [ ] 国产 ROM 杀后台/省电模式长期实机验收  
+- [x] **通知进帖 → 系统返回 / 顶栏返回 → 回到进通知前界面**（热启动）；冷启至少回壳 `/`（**0.0.3 真机通过**）  
+- [x] 杀进程后周期任务仍注册：冷启动重排程 + isolate 插件注册 + channel（**代码已加固**）  
+- [ ] 国产 ROM 杀后台/省电模式 **长期实机**（用户测：关 app 后是否仍收到新文通知）  
 
 ---
 
@@ -714,7 +731,7 @@ preparing → queued → running → completed / failed
 - [x] 失败友好占位（不崩）；Set「清除全部评论」  
 - [x] 场景帧 `kWepseedCommentScene` + 人设只写语气（`llm_prompt.dart`）  
 - [x] 模型编辑改 Dialog + 写后校验（D2 已验收）  
-- [x] **D1 评论乱码 / 编码代码修复**（严格 UTF-8 字节解码 + 脏文本拦截；真实端点重生成待验收）  
+- [x] **D1 评论乱码 / 编码**（UTF-8 + 脏文本拒绝；**真机通过**）  
 - [x] D2 模型保存真机验收通过  
 - [x] D6 生成状态 / 完成提醒 / 空结果重试 / 失败不写伪气泡  
 - [x] 提供商共享并发 + RPM 队列；默认依次请求、逐条显示  
@@ -722,17 +739,17 @@ preparing → queued → running → completed / failed
 - [x] HTTP 有限重试（超时 / 网络 / 429 / 5xx；401 不重试）  
 - [x] 提供商编辑 **测试连接**（独立 HttpLlmClient，不占评论队列）  
 - [ ]（可选）流式输出到评论气泡  
-- [ ] 持久化评论任务 + WorkManager 恢复（杀进程可靠后台）  
+- [ ] **D-task**：持久化评论任务 + WorkManager 恢复（杀进程可靠后台）— **未实现**  
 
 ### Phase E — ME 温度与通知 ✅ 主路径
 
 - [x] warm 规则 binge/streak/nightOwl + 同日去重  
 - [x] ME / warm / dwell **Drift 持久化**（替换 mock 内存）  
-- [x] WorkManager + 本地通知 + `/article/:id` 深链  
-- [x] 通知权限、Wi‑Fi/unmetered 约束、周期设置热更新  
-- [ ] 厂商 ROM 后台长期实机验收  
+- [x] WorkManager + 本地通知 + `/article/:id` 深链（**RSS 刷新**；不含评论 D-task）  
+- [x] 通知权限、Wi‑Fi/unmetered、周期热更新、**冷启动重排程 / isolate 插件 / channel**  
+- [ ] 厂商 ROM 后台长期实机验收（用户）  
 
-### Phase F — 打磨 ⚠ 部分已接（0.0.3）
+### Phase F — 打磨 ⚠ 部分已接（0.0.3 真机通过）
 
 - [x] 根页返回拦截（双击退出）  
 - [x] 关于：真版本 / 检查更新（GitHub）/ 应用内下载安装 / 协议隐私外链 / 仓库入口  
@@ -741,9 +758,9 @@ preparing → queued → running → completed / failed
 - [x] 测试：LLM 重试 · semver/ABI 选取（`test/semver_test.dart`）  
 - [ ] 性能 / 错误空态补强  
 - [ ] **应用内 WebView 阅读器**（见 §15.6）  
-- [x] New 筛选 UI（今日/未看/多源 + 持久化 + 选源限刷） 
+- [x] New 筛选 UI（今日/未看/多源 + 持久化 + 选源限刷；**真机通过**） 
 
-> 下一会话：先汇总 **0.0.3 真机反馈**；再评论任务杀进程恢复 / ROM 说明 / 剩余 F。
+> 下一会话：**D-task 实现** → 再 ROM 验收 / F 余。
 
 ---
 
@@ -846,9 +863,9 @@ UI 只依赖接口；**Phase B 新增 `DriftFeedRepository` / `DriftArticleRepos
 - [x] 后台刷新 + 通知进文章（E）  
 - [x] ME warm 持久化 + 温度规则（E）  
 - [x] 返回 / Toast / 关于更新安装 / LLM 重试·测连 / Release（F 一批）  
-- [x] 通知深链返回栈 + New 筛选（0.0.3）  
+- [x] 通知深链返回栈 + New 筛选（0.0.3；**真机通过**）  
+- [ ] **D-task** 评论任务杀进程恢复（**未做**）  
 - [ ] 应用内 WebView（F 余）  
-- [ ] 评论任务杀进程恢复  
 
 ---
 
@@ -882,49 +899,31 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.1 一句话
 
-**`v0.0.3` 已推 tag（`3aaa9f8`）：通知深链 `push` 修返回栈 + New 筛选持久化/选源限刷。本轮合入无问题。下一会话：装 Release 真机回归 → 收反馈 → 再 D-task / ROM / F 余。**
+**`v0.0.4`：评论清洗思考/tool 泄漏 + ME 收藏/对话/痕迹列表 CRUD + RSS 后台加固。发 tag 后真机综合测。D-task 评论杀进程恢复仍未做。**
 
 ### 15.2 现状速查
 
 | 模块 | 路径 / 要点 |
 |------|-------------|
-| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.3`** · main `3aaa9f8` |
+| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.3`** |
 | Flag | `kUseMockFeed=false`；`kUseMockComments=false` |
-| 版本 | `pubspec` `0.0.3+3`；Release CI 用 tag 覆盖 build-name/number |
-| Drift | **schemaVersion = 4**（`feedFilterJson`） |
-| RSS / DI | `lib/data/rss/*` · `core_providers.dart` |
-| 正文 / 目录 | `article_body` · 详情 `EdgeScrubber` only |
-| New | **无时间轨**；tune sheet · `filteredArticlesProvider` |
-| 通知深链 | `app.dart` `_openDeepLink` → **`router.push` only** |
-| 详情返回 | `article_detail_page` `_leaveDetail`：`canPop`? pop : `go('/')` |
-| New 筛选 | `FeedFilter` · `feed_filter.dart` · settings JSON · `refreshAll(feedIds:)` |
-| 后台刷新 | `background_refresh_service`：`feedIds` 非空则限刷 |
-| LLM HTTP | `http_llm_client.dart`：**3 次尝试**，超时/网络/429/5xx 重试 |
-| 测连 | `llm_settings_section`「测试连接」→ 裸 `HttpLlmClient` |
-| 评论 | `comment_repository_impl` + activity Toast「查看」也走 push |
-| Toast | `core/ui/app_toast.dart` · `appMessengerKey` |
-| 返回壳 | `app_shell.dart` `PopScope` 双击退出 |
-| 更新 | `github_update_service` · Set `_UpdateSheet` |
-| 链接 | `app_links.dart` · `docs/TERMS.md` · `docs/PRIVACY.md` |
-| 签名 | `docs/SIGNING.private.md`（gitignore）· Secrets：`KEYSTORE_*` |
-| CI | `release.yml` · **Maven：google/central 优先**，Aliyun 备用 |
-| 测试 | `feed_filter_test` · `llm_client` · `semver` · rss/toc/warm/widget |
+| 版本 | `pubspec` `0.0.3+3` |
+| Drift | **schemaVersion = 4**；**无** comment_jobs |
+| RSS 后台 | `background_refresh_service.dart`：`scheduleFromDatabase` · `runRssRefreshJob` · `DartPluginRegistrant` |
+| 通知 | `notification_service.dart`：channel `rss_updates` 显式创建 |
+| 启动 | `main.dart` → `scheduleFromDatabase()`（含 initialize + configure） |
+| 设置变更 | `app.dart` listen → `configure` |
+| Set 文案 | DATA「后台被杀？」+ 刷新频率说明系统最短 15 分 |
+| 通知深链 | `push` only |
+| 评论生成 | 仍内存 Future（D-task 未做） |
 | 债表 | **§1.5** |
 
 ### 15.3 下一会话建议顺序
 
-1. **装** https://github.com/WEP-56/wepseed/releases/tag/v0.0.3 （`wepseed-0.0.3-arm64-v8a.apk`）  
-2. **真机清单**  
-   - 通知/小 Toast「查看」进帖 → 返回应回跳转前界面（热启动）；冷启至少回壳  
-   - New 筛选：今日 / 未看 / 多源叠加；杀进程仍保留；选源后下拉与后台只刷所选  
-   - Toast 不挡底栏；关于检查更新安装；LLM 测连  
-   - D1：清评论 → 真 Key 重开 → 中文可读  
-3. 未通过：按 §1.5 定点修  
-4. 通过后主线（择一）：  
-   - **D-task**：评论生成任务持久化 + WorkManager 恢复  
-   - E-ROM：Set 厂商后台说明 + 长期验收  
-   - F 余：流式气泡 / WebView（§15.6）  
-5. 再发版：`git tag vX.Y.Z && git push origin vX.Y.Z`（勿 Aliyun 优先）
+1. **用户 E-ROM 实机**：开更新通知 → 订阅活跃源 → 划掉 app → 等 ≥15–30 分（或 adb 强制跑 WM）→ 应有新文通知；失败查自启动/电池  
+2. **可选 D-task**（评论杀进程恢复，独立于 RSS）  
+3. F 余：流式 / WebView  
+4. 再发版 tag
 
 ### 15.4 不要做的事
 
@@ -985,15 +984,22 @@ flutter run -d <device>
 |------|------|
 | **0.0.1** | 首 tag Release；MIT；签名私密手册 |
 | **0.0.2** | 双击退出；`showAppToast`；关于真版本 + 检查更新安装；TERMS/PRIVACY；LLM 重试 + 测连；CI Maven 官方优先 |
-| **0.0.3** | F-notif-back（`push`）；New `FeedFilter` + schema 4；选源限刷；`feed_filter_test` |
-| **未收口** | 0.0.3 真机回归；D1 确认；D-task；ROM；流式/WebView |
+| **0.0.3** | F-notif-back（`push`）；New `FeedFilter` + schema 4；选源限刷；`feed_filter_test`；**真机回归通过** |
+| **0.0.4** | 评论 `sanitizeLlmCommentText`（去 think/tool）；ME 三 stat → 列表 CRUD；RSS WM 加固（冷启动/插件/channel） |
+| **未收口** | E-ROM 用户长期验；**D-task**（评论）；流式/WebView |
 
-### 15.9 本会话（0.0.3 发版）要点
+### 15.9 会话记录
 
-- 根因：通知/Toast 用 `router.go` 清栈 → 返回出应用；改为 `_openDeepLink` + `push`  
-- 筛选：客户端 `applyFeedFilter`；设置落库；`refreshAll(feedIds:)` 前后台一致  
-- 发布：`pubspec 0.0.3+3` · tag `v0.0.3` · push `origin/main`  
-- 用户口径：本轮修复/优化 **无问题**；下会话装包验真机  
+**0.0.3 发版：** 通知 `go`→`push`；筛选落库 + 选源限刷；tag `v0.0.3`。
+
+**真机反馈会话：** 0.0.3 清单全过；D-task 未做。
+
+**本会话（RSS 后台加固）：** 用户需求=杀后台仍能 RSS 更新通知。  
+- isolate：`DartPluginRegistrant` + 抽 `runRssRefreshJob`  
+- 冷启动：`scheduleFromDatabase`  
+- 去掉 `requiresBatteryNotLow`；通知 channel 显式创建  
+- Set：后台被杀说明；文档 §4.8 / §1.5 同步  
+- **不是**评论 D-task  
 
 ---
 

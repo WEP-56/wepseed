@@ -90,6 +90,15 @@ class MockArticleRepository implements ArticleRepository {
   }
 
   @override
+  Stream<List<Article>> watchBookmarkedArticles() async* {
+    List<Article> pick() => List.unmodifiable(
+          _articles.where((a) => _bookmarkedIds.contains(a.id)),
+        );
+    yield pick();
+    yield* _timelineController.stream.map((_) => pick());
+  }
+
+  @override
   Stream<Map<String, int>> watchUnreadCounts() async* {
     yield Map.unmodifiable(_unreadBySource);
     yield* _unreadController.stream;

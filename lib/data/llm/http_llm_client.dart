@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/models.dart';
 import 'llm_client.dart';
+import 'llm_text_sanitize.dart';
 
 /// Real HTTP client for OpenAI-compatible chat/completions, Responses, and Anthropic.
 class HttpLlmClient implements LlmClient {
@@ -21,11 +22,15 @@ class HttpLlmClient implements LlmClient {
     await for (final chunk in completeStream(messages, config)) {
       buf.write(chunk);
     }
-    final text = buf.toString().trim();
-    if (text.isEmpty) {
+    final raw = buf.toString().trim();
+    if (raw.isEmpty) {
       throw LlmException('模型返回为空');
     }
-    _validateModelText(text);
+    _validateModelText(raw);
+    final text = sanitizeLlmCommentText(raw);
+    if (text.isEmpty) {
+      throw LlmException('模型只返回了思考过程，没有可用评论');
+    }
     return text;
   }
 

@@ -27,6 +27,22 @@ class MockWarmEventRepository implements WarmEventRepository {
   }
 
   @override
+  Future<void> remove(String id) async {
+    _events = _events.where((e) => e.id != id).toList();
+    if (!_controller.isClosed) {
+      _controller.add(List.unmodifiable(_events));
+    }
+  }
+
+  @override
+  Future<void> removeByTypes(Set<MeEventType> types) async {
+    _events = _events.where((e) => !types.contains(e.type)).toList();
+    if (!_controller.isClosed) {
+      _controller.add(List.unmodifiable(_events));
+    }
+  }
+
+  @override
   Future<void> recordRead(Article article, DateTime at) async {}
 
   void dispose() {

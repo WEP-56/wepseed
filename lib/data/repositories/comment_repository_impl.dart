@@ -7,6 +7,7 @@ import '../db/app_database.dart';
 import '../llm/llm_client.dart';
 import '../llm/llm_prompt.dart';
 import '../llm/llm_resolve.dart';
+import '../llm/llm_text_sanitize.dart';
 import '../models/models.dart';
 import 'comment_repository.dart';
 import 'llm_provider_repository.dart';
@@ -271,7 +272,8 @@ class CommentRepositoryImpl implements CommentRepository {
         netizenTopLevelMessages(netizen: netizen, article: article),
         cfg.copyWith(onQueuePhase: onQueuePhase),
       );
-      if (text.trim().isNotEmpty) return text.trim();
+      final cleaned = sanitizeLlmCommentText(text);
+      if (cleaned.isNotEmpty) return cleaned;
       return null;
     } on LlmException {
       return null;
@@ -315,7 +317,8 @@ class CommentRepositoryImpl implements CommentRepository {
         ),
         cfg.copyWith(onQueuePhase: onQueuePhase),
       );
-      if (text.trim().isNotEmpty) return text.trim();
+      final cleaned = sanitizeLlmCommentText(text);
+      if (cleaned.isNotEmpty) return cleaned;
       return null;
     } on LlmException {
       return null;

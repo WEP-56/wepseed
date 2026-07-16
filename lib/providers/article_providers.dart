@@ -48,6 +48,10 @@ final bookmarkedIdsProvider = StreamProvider<Set<String>>((ref) {
   return ref.watch(articleRepositoryProvider).watchBookmarkedIds();
 });
 
+final bookmarkedArticlesProvider = StreamProvider<List<Article>>((ref) {
+  return ref.watch(articleRepositoryProvider).watchBookmarkedArticles();
+});
+
 final isReadProvider = Provider.family<bool, String>((ref, id) {
   final ids = ref.watch(readIdsProvider).value;
   if (ids != null) return ids.contains(id);
@@ -79,4 +83,7 @@ class ArticleActions {
     final bookmarked = _repo.isBookmarked(id);
     await _repo.setBookmarked(id, !bookmarked);
   }
+
+  Future<void> setBookmarked(String id, bool value) =>
+      _repo.setBookmarked(id, value);
 }

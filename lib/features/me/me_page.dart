@@ -68,6 +68,9 @@ class MePage extends ConsumerWidget {
                             e.type == MeEventType.nightOwl,
                       )
                       .length,
+                  onBookmarks: () => context.push('/me/bookmarks'),
+                  onChats: () => context.push('/me/chats'),
+                  onTraces: () => context.push('/me/traces'),
                 ),
               ],
             ),
@@ -166,60 +169,100 @@ class _StatsRow extends StatelessWidget {
     required this.bookmarks,
     required this.chats,
     required this.moments,
+    required this.onBookmarks,
+    required this.onChats,
+    required this.onTraces,
   });
 
   final int bookmarks;
   final int chats;
   final int moments;
+  final VoidCallback onBookmarks;
+  final VoidCallback onChats;
+  final VoidCallback onTraces;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: _StatChip(label: '收藏', value: '$bookmarks')),
+        Expanded(
+          child: _StatChip(
+            label: '收藏',
+            value: '$bookmarks',
+            onTap: onBookmarks,
+          ),
+        ),
         const SizedBox(width: 8),
-        Expanded(child: _StatChip(label: '对话', value: '$chats')),
+        Expanded(
+          child: _StatChip(
+            label: '对话',
+            value: '$chats',
+            onTap: onChats,
+          ),
+        ),
         const SizedBox(width: 8),
-        Expanded(child: _StatChip(label: '痕迹', value: '$moments')),
+        Expanded(
+          child: _StatChip(
+            label: '痕迹',
+            value: '$moments',
+            onTap: onTraces,
+          ),
+        ),
       ],
     );
   }
 }
 
 class _StatChip extends StatelessWidget {
-  const _StatChip({required this.label, required this.value});
+  const _StatChip({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
 
   final String label;
   final String value;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.inkCard : AppColors.paper,
+    return Material(
+      color: isDark ? AppColors.inkCard : AppColors.paper,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? AppColors.borderDark : AppColors.borderLight,
-          width: 0.5,
-        ),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              width: 0.5,
             ),
           ),
-        ],
+          child: Column(
+            children: [
+              Text(
+                value,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: isDark
+                      ? AppColors.textTertiaryDark
+                      : AppColors.textTertiaryLight,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

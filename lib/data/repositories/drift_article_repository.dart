@@ -79,6 +79,23 @@ class DriftArticleRepository implements ArticleRepository {
   }
 
   @override
+  Stream<List<Article>> watchBookmarkedArticles() {
+    final query = _db.select(_db.articles).join([
+      innerJoin(_db.feeds, _db.feeds.id.equalsExp(_db.articles.feedId)),
+    ])
+      ..where(_db.articles.isBookmarked.equals(true))
+      ..orderBy([
+        OrderingTerm.desc(_db.articles.bookmarkedAt),
+        OrderingTerm.desc(_db.articles.publishedAt),
+      ]);
+    return query.watch().map((rows) {
+      return rows.map((row) {
+        return _mapArticle(row.readTable(_db.articles), row.readTable(_db.feeds));
+      }).toList();
+    });
+  }
+
+  @override
   Stream<Map<String, int>> watchUnreadCounts() {
     // Emit whenever articles change; aggregate unread per feedId.
     return _db.select(_db.articles).watch().map((rows) {

@@ -11,7 +11,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('zh_CN');
   await NotificationService.instance.initialize();
-  await BackgroundRefreshService.initialize();
+  // Register WM callback + enqueue periodic RSS pull from disk settings so
+  // kill-background still gets a schedule after cold start / force-stop reopen.
+  await BackgroundRefreshService.scheduleFromDatabase();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );

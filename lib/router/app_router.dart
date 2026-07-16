@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../app_shell.dart';
+import '../features/me/me_list_page.dart';
 import '../features/new/article_detail_page.dart';
 import '../features/new/source_feed_page.dart';
 
@@ -14,6 +15,27 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/',
         pageBuilder: (context, state) =>
             const NoTransitionPage(child: AppShell()),
+      ),
+      GoRoute(
+        path: '/me/bookmarks',
+        pageBuilder: (context, state) => _fadePage(
+          state: state,
+          child: const MeListPage(kind: MeListKind.bookmarks),
+        ),
+      ),
+      GoRoute(
+        path: '/me/chats',
+        pageBuilder: (context, state) => _fadePage(
+          state: state,
+          child: const MeListPage(kind: MeListKind.chats),
+        ),
+      ),
+      GoRoute(
+        path: '/me/traces',
+        pageBuilder: (context, state) => _fadePage(
+          state: state,
+          child: const MeListPage(kind: MeListKind.traces),
+        ),
       ),
       GoRoute(
         path: '/article/:id',

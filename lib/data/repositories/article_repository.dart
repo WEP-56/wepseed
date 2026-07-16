@@ -9,6 +9,10 @@ abstract class ArticleRepository {
   Future<void> markSourceSeen(String feedId);
   Stream<Set<String>> watchReadIds();
   Stream<Set<String>> watchBookmarkedIds();
+
+  /// Bookmarked articles, newest bookmark first.
+  Stream<List<Article>> watchBookmarkedArticles();
+
   bool isRead(String id);
   bool isBookmarked(String id);
 }

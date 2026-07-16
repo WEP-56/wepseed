@@ -35,6 +35,18 @@ class DriftWarmEventRepository implements WarmEventRepository {
   }
 
   @override
+  Future<void> remove(String id) async {
+    await (_db.delete(_db.warmEvents)..where((t) => t.id.equals(id))).go();
+  }
+
+  @override
+  Future<void> removeByTypes(Set<MeEventType> types) async {
+    if (types.isEmpty) return;
+    final names = types.map(_typeToDb).toList();
+    await (_db.delete(_db.warmEvents)..where((t) => t.type.isIn(names))).go();
+  }
+
+  @override
   Future<void> recordRead(Article article, DateTime at) async {
     if (at.hour < 5) {
       await add(
