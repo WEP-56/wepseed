@@ -2,11 +2,11 @@
 
 > 版本：**0.0.3**（tag `v0.0.3` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
 > 平台：Flutter · Android 首发 · 本地优先（local-only）  
-> 状态：**A–E + F 打磨 + 0.0.3**（通知返回栈 / New 筛选持久化限刷）；用户 **真机验 0.0.3**  
+> 状态：**0.0.3 已发**（通知返回栈 + New 筛选）；本轮代码合入无问题；**待真机装 Release 回归**  
 > 开关：`kUseMockFeed` / `kUseMockComments`（`lib/core/config/app_flags.dart`）
 
 本文档只写**要做什么、做成什么样、怎么落地**。  
-**新会话请从 §1 现状 + §1.5 已知问题 + §8 + §15 交接 起读。**
+**新会话请从 §15 交接 + §1 现状 + §1.5 债表 起读。**
 
 ---
 
@@ -48,8 +48,8 @@ lib/
   router/app_router.dart          # / · /article/:id · /source/:id
   core/config/app_flags.dart · app_links.dart   # GitHub / 协议 / API 常量
   core/ui/app_toast.dart          # 抬高底栏的统一 Toast
-  core/theme/…  core/utils/open_url.dart · time_labels.dart · monogram.dart
-  core/background/                # WorkManager + 本地通知
+  core/theme/…  core/utils/…    # open_url · time_labels · monogram · feed_filter
+  core/background/                # WorkManager + 本地通知 · 选源限刷
   data/
     models/models.dart
     mock/mock_data.dart           # 仅 kUseMockFeed=true
@@ -69,7 +69,7 @@ docs/
   ci.yml · release.yml            # tag v* → 分包 APK Release
 android/                          # 官方 Maven 优先；Aliyun 备用
 test/
-  fixtures/ · rss_parser · toc · time_labels · llm_client · semver · warm · widget
+  fixtures/ · rss_parser · toc · time_labels · feed_filter · llm_client · semver · warm · widget
 ```
 
 ### 1.2 已可交互（真 / 半真）
@@ -82,7 +82,8 @@ test/
 | 多网友 CRUD | Drift（权重 / 人设 / 模型绑定） |
 | 评论触发 | off / onBrowse / onOpenComments |
 | 评论区 UI | 真 LLM；无 Key 留空；clearAll；**HTTP 超时/429/5xx 重试**；D1 编码已修，**真机待确认** |
-| New / 源 / 详情 | 真流；HTML；目录 scrubber；dwell |
+| New / 源 / 详情 | 真流；**筛选**（今日/未看/多源 + 持久化 + 选源限刷）；HTML；目录 scrubber；dwell |
+| 通知深链 | payload `/article/:id`；**`router.push`**（勿 go）；详情/源 `canPop` 兜底 `go('/')` |
 | ME | warm Drift + 温度规则 |
 | Set · RSS | 添加 / 列表 / OPML |
 | Set · 关于 | **PackageInfo 真版本**；检查更新 → GitHub Releases → **应用内下载安装**；协议/隐私外链；关于 → 仓库 |
@@ -91,11 +92,11 @@ test/
 
 ### 1.3 明确未做 / 下一会话可选主路径
 
-**用户真机测 0.0.3** —— 重点：通知返回栈、New 筛选、D1 评论中文。
+**0.0.3 代码已合入**（本轮：F-notif-back + F-filter 无问题）。下一会话优先 **真机装 `v0.0.3` APK 回归**，再开新功能。
 
 | 优先级 | 项 |
 |--------|-----|
-| 高 | 真机回归：返回 / Toast / 更新安装 / LLM 测连与评论可读（D1） |
+| 高 | 真机：通知进帖返回栈 · New 筛选 · Toast · 更新安装 · LLM 测连 · D1 评论中文 |
 | 中 | 评论任务持久化 + WorkManager 恢复（杀进程可靠） |
 | 中 | 厂商 ROM 后台长期验收与 Set 说明文案 |
 | 低 | 评论流式气泡；应用内 WebView（§15.6） |
@@ -120,18 +121,18 @@ test/
 | 签名 | `docs/SIGNING.private.md`（本地 only） | 勿提交 jks / key.properties |
 | 评论清空 | `CommentRepository.clearAll` | 清旧 mock / 脏串后重生成 |
 
-### 1.5 已知问题 / 技术债（登记 · 0.0.3 真机测中）
+### 1.5 已知问题 / 技术债（登记 · 0.0.3）
 
-> 下会话：**先听真机反馈**，再决定修债还是做任务持久化。
+> 下会话：**先装 `v0.0.3` 真机回归**；无阻塞再开 D-task / ROM / F 余。
 
 | # | 现象 | 状态 |
 |---|------|------|
-| D1 | 评论乱码 / 方块 / 西里尔 | **代码已修**（UTF-8 `bodyBytes` + 脏文本拒绝）；清评论后真端点重生成 — **0.0.2 待用户确认** |
+| D1 | 评论乱码 / 方块 / 西里尔 | **代码已修**（UTF-8 `bodyBytes` + 脏文本拒绝）；清评论后真端点重生成 — **仍待真机确认** |
 | D2 | 模型保存失败 | **已修已验收，关闭** |
 | D3–D7 | mock 占坑 / 场景帧 / 时间轨 / 状态 / 绑定回退 | **已改**（见历史行；D5 产品砍轨） |
 | F-back | 一点返回就退出 | **0.0.2 已修**（双击退出） |
-| F-notif-back | 通知/小 Toast「查看」进帖子后返回直接回桌面，再进仍停在帖子 | **0.0.3 已修**（`go`→`push` + 详情/源页 `canPop` 兜底 `go('/')`）；待真机确认 |
-| F-filter | New 筛选占位 | **0.0.3 已接**（今日/未看/多源 + 持久化 + 选源限刷） |
+| F-notif-back | 通知/小 Toast「查看」进帖返回直接回桌面 | **0.0.3 代码已合**（`go`→`push` + `_leaveDetail`）；**待真机确认** |
+| F-filter | New 筛选 | **0.0.3 代码已合**（今日/未看/多源 + 持久化 + 选源限刷）；**待真机确认** |
 | F-toast | SnackBar 挡底栏 | **0.0.2 已修**（`showAppToast`） |
 | F-about | 关于 1.0.0 占位 | **0.0.2 已修**（真版本 + 更新/协议/GitHub） |
 | F-llm | 无重试 / 无测连 | **0.0.2 已修** |
@@ -881,47 +882,54 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.1 一句话
 
-**A–E 齐 + 0.0.3 已发（0.0.2 打磨 + 通知返回栈 + New 筛选持久化限刷）。用户真机测 0.0.3；下一会话先收反馈，再做评论任务杀进程恢复或 F 余项。**
+**`v0.0.3` 已推 tag（`3aaa9f8`）：通知深链 `push` 修返回栈 + New 筛选持久化/选源限刷。本轮合入无问题。下一会话：装 Release 真机回归 → 收反馈 → 再 D-task / ROM / F 余。**
 
 ### 15.2 现状速查
 
 | 模块 | 路径 / 要点 |
 |------|-------------|
-| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag `v0.0.3` |
+| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.3`** · main `3aaa9f8` |
 | Flag | `kUseMockFeed=false`；`kUseMockComments=false` |
 | 版本 | `pubspec` `0.0.3+3`；Release CI 用 tag 覆盖 build-name/number |
+| Drift | **schemaVersion = 4**（`feedFilterJson`） |
 | RSS / DI | `lib/data/rss/*` · `core_providers.dart` |
 | 正文 / 目录 | `article_body` · 详情 `EdgeScrubber` only |
-| New | **无时间轨**；`feedFilter` + tune sheet |
+| New | **无时间轨**；tune sheet · `filteredArticlesProvider` |
+| 通知深链 | `app.dart` `_openDeepLink` → **`router.push` only** |
+| 详情返回 | `article_detail_page` `_leaveDetail`：`canPop`? pop : `go('/')` |
+| New 筛选 | `FeedFilter` · `feed_filter.dart` · settings JSON · `refreshAll(feedIds:)` |
+| 后台刷新 | `background_refresh_service`：`feedIds` 非空则限刷 |
 | LLM HTTP | `http_llm_client.dart`：**3 次尝试**，超时/网络/429/5xx 重试 |
-| LLM 队列 | `scheduled_llm_client.dart` |
 | 测连 | `llm_settings_section`「测试连接」→ 裸 `HttpLlmClient` |
-| 评论 | `comment_repository_impl` + `comment_providers`（activity Toast） |
+| 评论 | `comment_repository_impl` + activity Toast「查看」也走 push |
 | Toast | `core/ui/app_toast.dart` · `appMessengerKey` |
-| 返回 | `app_shell.dart` `PopScope`；详情 `_leaveDetail` |
-| 通知深链 | `notification_service` + `app.dart` `_openDeepLink`（**push**） |
-| New 筛选 | `models.FeedFilter` · `core/utils/feed_filter.dart` · `filteredArticlesProvider` · `new_page` sheet |
-| 更新 | `data/update/github_update_service.dart` · Set `_UpdateSheet` |
-| 链接 | `core/config/app_links.dart` · `docs/TERMS.md` · `docs/PRIVACY.md` |
-| Warm / 后台 | Drift warm · `background_refresh_service` · `notification_service` |
-| 签名私密 | `docs/SIGNING.private.md`（gitignore）· Secrets：`KEYSTORE_*` |
-| CI | `.github/workflows/release.yml` · **Maven：google/central 优先**，Aliyun 备用 |
-| 测试 | `llm_client`（含重试）· `semver_test` · rss/toc/warm/widget |
+| 返回壳 | `app_shell.dart` `PopScope` 双击退出 |
+| 更新 | `github_update_service` · Set `_UpdateSheet` |
+| 链接 | `app_links.dart` · `docs/TERMS.md` · `docs/PRIVACY.md` |
+| 签名 | `docs/SIGNING.private.md`（gitignore）· Secrets：`KEYSTORE_*` |
+| CI | `release.yml` · **Maven：google/central 优先**，Aliyun 备用 |
+| 测试 | `feed_filter_test` · `llm_client` · `semver` · rss/toc/warm/widget |
 | 债表 | **§1.5** |
 
 ### 15.3 下一会话建议顺序
 
-1. **读用户 0.0.3 真机反馈**（通知返回、New 筛选、Toast、更新安装、测连、评论中文）  
-2. 未通过项：按 §1.5 定点修，优先 D1 若仍乱码  
-3. 通过后可选主线：  
-   - 评论任务持久化 + WorkManager 恢复  
-   - Set 厂商后台说明 + ROM 验收  
-   - 流式气泡 / WebView（F）  
-4. 发版：`git tag vX.Y.Z && git push origin vX.Y.Z`（勿依赖 Aliyun 优先）
+1. **装** https://github.com/WEP-56/wepseed/releases/tag/v0.0.3 （`wepseed-0.0.3-arm64-v8a.apk`）  
+2. **真机清单**  
+   - 通知/小 Toast「查看」进帖 → 返回应回跳转前界面（热启动）；冷启至少回壳  
+   - New 筛选：今日 / 未看 / 多源叠加；杀进程仍保留；选源后下拉与后台只刷所选  
+   - Toast 不挡底栏；关于检查更新安装；LLM 测连  
+   - D1：清评论 → 真 Key 重开 → 中文可读  
+3. 未通过：按 §1.5 定点修  
+4. 通过后主线（择一）：  
+   - **D-task**：评论生成任务持久化 + WorkManager 恢复  
+   - E-ROM：Set 厂商后台说明 + 长期验收  
+   - F 余：流式气泡 / WebView（§15.6）  
+5. 再发版：`git tag vX.Y.Z && git push origin vX.Y.Z`（勿 Aliyun 优先）
 
 ### 15.4 不要做的事
 
 - 恢复 New 左侧时间轨（除非产品改口）  
+- 通知深链改回 `router.go`（会清栈，F-notif-back 复发）  
 - 无必要重写 masonry / 玻璃  
 - 应用内 WebView（未明确开工前）  
 - 大改 RSS 解析（除非源坏了）  
@@ -937,7 +945,7 @@ flutter pub get
 flutter analyze
 flutter test
 flutter run -d <device>
-# 或装 Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.3
+# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.3
 # 首选 wepseed-0.0.3-arm64-v8a.apk
 ```
 
@@ -965,16 +973,27 @@ flutter run -d <device>
 | 人设 | 只写语气；场景 `kWepseedCommentScene` |
 | 深色正文 | 强制高对比；strip 内联灰色 |
 | 根返回 | 先回 New，New 上双击退出 |
+| 通知深链 | **`push` 保留栈**；禁止用 `go` 进帖 |
+| New 筛选 | 今日∩未看∩源可叠；**仅选源时限刷**；持久化 `feedFilterJson` |
 | 更新 | GitHub Releases 分包 APK；优先 arm64-v8a |
 | 协议隐私 | 外链仓库 `docs/TERMS.md` / `PRIVACY.md` |
 | 开源 | MIT |
 
-### 15.8 本会话变更摘要（便于 diff 记忆）
+### 15.8 版本变更摘要
 
-- **0.0.1**：首 tag Release；MIT；签名私密手册  
-- **0.0.2**：返回双击退出；`showAppToast`；关于真版本 + 检查更新下载安装；TERMS/PRIVACY；LLM 重试 + 测试连接；CI Maven 官方优先（修 Aliyun 502）  
-- **0.0.3**：通知/Toast 进帖 `go`→`push`（F-notif-back）；New `FeedFilter` 今日/未看/多源 + 持久化 + 选源限刷；Drift schema 4  
-- **未收口**：0.0.3 真机全量验收；评论任务杀进程；ROM 后台；流式/WebView  
+| 版本 | 内容 |
+|------|------|
+| **0.0.1** | 首 tag Release；MIT；签名私密手册 |
+| **0.0.2** | 双击退出；`showAppToast`；关于真版本 + 检查更新安装；TERMS/PRIVACY；LLM 重试 + 测连；CI Maven 官方优先 |
+| **0.0.3** | F-notif-back（`push`）；New `FeedFilter` + schema 4；选源限刷；`feed_filter_test` |
+| **未收口** | 0.0.3 真机回归；D1 确认；D-task；ROM；流式/WebView |
+
+### 15.9 本会话（0.0.3 发版）要点
+
+- 根因：通知/Toast 用 `router.go` 清栈 → 返回出应用；改为 `_openDeepLink` + `push`  
+- 筛选：客户端 `applyFeedFilter`；设置落库；`refreshAll(feedIds:)` 前后台一致  
+- 发布：`pubspec 0.0.3+3` · tag `v0.0.3` · push `origin/main`  
+- 用户口径：本轮修复/优化 **无问题**；下会话装包验真机  
 
 ---
 
