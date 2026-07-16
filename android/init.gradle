@@ -1,33 +1,34 @@
-// Force Chinese mirrors for all projects (including Flutter's included builds).
+// Optional init script (only if applied with --init-script).
+// Prefer official Maven; keep Aliyun as last-resort mirrors for China networks.
 settingsEvaluated { settings ->
     settings.pluginManagement.repositories.clear()
     settings.pluginManagement.repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
         maven { url 'https://maven.aliyun.com/repository/google' }
         maven { url 'https://maven.aliyun.com/repository/central' }
         maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
         maven { url 'https://maven.aliyun.com/repository/public' }
-        google()
-        mavenCentral()
-        gradlePluginPortal()
     }
 }
 
 allprojects {
     buildscript {
         repositories {
+            google()
+            mavenCentral()
             maven { url 'https://maven.aliyun.com/repository/google' }
             maven { url 'https://maven.aliyun.com/repository/central' }
             maven { url 'https://maven.aliyun.com/repository/public' }
             maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
-            google()
-            mavenCentral()
         }
     }
     repositories {
+        google()
+        mavenCentral()
         maven { url 'https://maven.aliyun.com/repository/google' }
         maven { url 'https://maven.aliyun.com/repository/central' }
         maven { url 'https://maven.aliyun.com/repository/public' }
-        google()
-        mavenCentral()
     }
 }

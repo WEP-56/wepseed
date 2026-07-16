@@ -82,7 +82,10 @@ jobs:
           echo "build_number=$CODE" >> "$GITHUB_OUTPUT"
           echo "Building $NAME+$CODE (tag $TAG)"
 
+      # Prefer Google / Maven Central (see android/* repository order). Aliyun is fallback only.
       - name: Build per-ABI release APKs
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
         run: |
           flutter build apk --release --split-per-abi \
             --build-name="${{ steps.ver.outputs.build_name }}" \

@@ -1,10 +1,11 @@
 allprojects {
     repositories {
+        // Official first so CI is not blocked by Aliyun 502s.
+        google()
+        mavenCentral()
         maven { url = uri("https://maven.aliyun.com/repository/google") }
         maven { url = uri("https://maven.aliyun.com/repository/central") }
         maven { url = uri("https://maven.aliyun.com/repository/public") }
-        google()
-        mavenCentral()
     }
 }
 
