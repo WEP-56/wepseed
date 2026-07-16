@@ -50,6 +50,8 @@ app.*.map.json
 **/*.keystore
 !android/key.properties.example
 docs/SIGNING.private.md
+docs/_signing_values.txt
+docs/_secrets_scratch.txt
 **/wepseed-keystore.b64
 
 # Local Claude / IDE noise
