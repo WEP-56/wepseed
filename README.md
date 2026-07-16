@@ -45,7 +45,7 @@ cp android/key.properties.example android/key.properties
 
 仓库已配置 [`.github/workflows/release.yml`](.github/workflows/release.yml)：
 
-1. 推送 tag：`git tag v1.6.0 && git push origin v1.6.0`
+1. 推送 tag：`git tag v0.0.1 && git push origin v0.0.1`
 2. Action 执行 `flutter build apk --release --split-per-abi`
 3. 自动创建 GitHub Release，挂上：
    - `wepseed-<ver>-arm64-v8a.apk`
