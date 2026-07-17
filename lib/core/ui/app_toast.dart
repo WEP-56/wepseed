@@ -28,10 +28,18 @@ void showAppToast(
   state.hideCurrentSnackBar();
   state.showSnackBar(
     SnackBar(
-      content: Text(message, style: const TextStyle(fontSize: 13.5, height: 1.25)),
+      content: Text(
+        message,
+        style: const TextStyle(fontSize: 13.5, height: 1.25),
+      ),
       behavior: SnackBarBehavior.floating,
       duration: duration,
-      margin: EdgeInsets.fromLTRB(16, 0, 16, kToastBottomClearance + bottomInset),
+      margin: EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        kToastBottomClearance + bottomInset,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       action: action,
     ),

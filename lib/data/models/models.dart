@@ -8,6 +8,8 @@ enum LlmProtocol { openaiChatCompletions, openaiResponses, anthropicMessages }
 
 enum CommentAuthorType { user, netizen }
 
+enum ArticleMediaType { blog, audio, video }
+
 class FeedSource {
   const FeedSource({
     required this.id,
@@ -40,6 +42,11 @@ class Article {
     this.imageAspect = 1.0,
     this.featured = false,
     this.tags = const [],
+    this.mediaType = ArticleMediaType.blog,
+    this.enclosureUrl,
+    this.enclosureMime,
+    this.enclosureLength,
+    this.durationSeconds,
   });
 
   final String id;
@@ -58,10 +65,20 @@ class Article {
   final double imageAspect;
   final bool featured;
   final List<String> tags;
+  final ArticleMediaType mediaType;
+  final String? enclosureUrl;
+  final String? enclosureMime;
+  final int? enclosureLength;
+  final int? durationSeconds;
 
   bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
 
   bool get hasHtmlBody => contentHtml != null && contentHtml!.trim().isNotEmpty;
+
+  bool get isMedia => mediaType != ArticleMediaType.blog;
+
+  bool get hasPlayableMedia =>
+      isMedia && enclosureUrl != null && enclosureUrl!.trim().isNotEmpty;
 
   /// Lead summary under title: hide when it duplicates the body start.
   bool get showSummaryAsLead {
@@ -74,6 +91,14 @@ class Article {
     return true;
   }
 }
+
+String articleMediaTypeToDb(ArticleMediaType type) => type.name;
+
+ArticleMediaType articleMediaTypeFromDb(String value) => switch (value) {
+  'audio' => ArticleMediaType.audio,
+  'video' => ArticleMediaType.video,
+  _ => ArticleMediaType.blog,
+};
 
 class UserProfile {
   const UserProfile({required this.displayName});
@@ -326,11 +351,8 @@ class FeedFilter {
   }
 
   @override
-  int get hashCode => Object.hash(
-    onlyToday,
-    onlyUnread,
-    Object.hashAllUnordered(feedIds),
-  );
+  int get hashCode =>
+      Object.hash(onlyToday, onlyUnread, Object.hashAllUnordered(feedIds));
 }
 
 /// UX prefs. LLM endpoints live in LlmProvider / LlmModel.

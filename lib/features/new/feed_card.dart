@@ -79,6 +79,14 @@ class _ImageCard extends StatelessWidget {
                     right: 8,
                     child: _ReadBadge(isDark: isDark),
                   ),
+                if (article.mediaType == ArticleMediaType.video)
+                  const Center(child: _VideoPlayBadge()),
+                if (article.isMedia)
+                  Positioned(
+                    left: 8,
+                    bottom: 8,
+                    child: _MediaBadge(type: article.mediaType, dark: true),
+                  ),
               ],
             ),
           ),
@@ -103,7 +111,9 @@ class _ImageCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
+                    color: isDark
+                        ? AppColors.textTertiaryDark
+                        : AppColors.textTertiaryLight,
                   ),
                 ),
               ],
@@ -148,6 +158,10 @@ class _TextCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              if (article.isMedia) ...[
+                _MediaBadge(type: article.mediaType),
+                const SizedBox(width: 7),
+              ],
               Expanded(
                 child: Text(
                   article.source.name.toUpperCase(),
@@ -155,7 +169,9 @@ class _TextCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.6,
                     fontSize: 10,
-                    color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
+                    color: isDark
+                        ? AppColors.textTertiaryDark
+                        : AppColors.textTertiaryLight,
                   ),
                 ),
               ),
@@ -163,7 +179,9 @@ class _TextCard extends StatelessWidget {
                 Icon(
                   Icons.done_all_rounded,
                   size: 14,
-                  color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
+                  color: isDark
+                      ? AppColors.textTertiaryDark
+                      : AppColors.textTertiaryLight,
                 ),
             ],
           ),
@@ -186,17 +204,88 @@ class _TextCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
               height: 1.45,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
           const SizedBox(height: 12),
           Text(
             relativeTime(article.publishedAt),
             style: theme.textTheme.labelSmall?.copyWith(
-              color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight,
+              color: isDark
+                  ? AppColors.textTertiaryDark
+                  : AppColors.textTertiaryLight,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MediaBadge extends StatelessWidget {
+  const _MediaBadge({required this.type, this.dark = false});
+
+  final ArticleMediaType type;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final foreground = dark
+        ? Colors.white
+        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: dark
+            ? Colors.black.withValues(alpha: 0.58)
+            : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            type == ArticleMediaType.audio
+                ? Icons.graphic_eq_rounded
+                : Icons.play_arrow_rounded,
+            size: 11,
+            color: foreground,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            type == ArticleMediaType.audio ? '音频' : '视频',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: foreground,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoPlayBadge extends StatelessWidget {
+  const _VideoPlayBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.black.withValues(alpha: 0.48),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
+      ),
+      child: const Icon(
+        Icons.play_arrow_rounded,
+        color: Colors.white,
+        size: 28,
       ),
     );
   }
@@ -227,10 +316,10 @@ class _ReadBadge extends StatelessWidget {
           Text(
             '已读',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),

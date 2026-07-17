@@ -17,6 +17,8 @@ import '../../providers/comment_providers.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/app_network_image.dart';
 import '../../widgets/liquid_glass.dart';
+import '../media/media_llm_chat.dart';
+import '../media/media_player_widgets.dart';
 import 'article_body.dart';
 import 'article_toc.dart';
 import 'comment_sheet.dart';
@@ -56,14 +58,20 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
   void initState() {
     super.initState();
     _dwellTimer = Timer(_dwellThreshold, _tryLogDwell);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       ref.read(articleActionsProvider).markRead(widget.articleId);
-      ref
-          .read(commentControllerProvider)
-          .ensureGenerated(widget.articleId, when: CommentTrigger.onBrowse);
-      if (widget.openComments) {
-        _openComments(widget.articleId);
+      final article = await ref
+          .read(articleRepositoryProvider)
+          .get(widget.articleId);
+      if (!mounted || article == null) return;
+      if (article.mediaType == ArticleMediaType.blog) {
+        ref
+            .read(commentControllerProvider)
+            .ensureGenerated(widget.articleId, when: CommentTrigger.onBrowse);
+        if (widget.openComments) _openComments(widget.articleId);
+      } else if (widget.openComments) {
+        showMediaLlmChat(context, article);
       }
     });
   }
@@ -127,6 +135,21 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
     }
     await Clipboard.setData(ClipboardData(text: url));
     if (mounted) showAppToast('链接已复制', context: context);
+  }
+
+  Future<void> _openMediaExternal(Article article) async {
+    final ok = await openExternalUrl(article.enclosureUrl ?? article.link);
+    if (!ok && mounted) showAppToast('没有可打开的媒体链接', context: context);
+  }
+
+  Future<void> _copyMediaLink(Article article) async {
+    final url = article.enclosureUrl?.trim();
+    if (url == null || url.isEmpty) {
+      if (mounted) showAppToast('没有可复制的媒体链接', context: context);
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: url));
+    if (mounted) showAppToast('媒体链接已复制', context: context);
   }
 
   Future<void> _share(Article article) async {
@@ -229,7 +252,17 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
             CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                if (article.hasImage)
+                if (article.mediaType == ArticleMediaType.video)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(12, top + 54, 12, 10),
+                      child: DetailMediaPlayer(
+                        article: article,
+                        onExternalOpen: () => _openMediaExternal(article),
+                      ),
+                    ),
+                  )
+                else if (article.hasImage)
                   _CoverSliver(article: article, isDark: isDark)
                 else
                   SliverToBoxAdapter(child: SizedBox(height: top + 52)),
@@ -287,6 +320,13 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
                             ),
                           ),
                         ],
+                        if (article.mediaType == ArticleMediaType.audio) ...[
+                          const SizedBox(height: 20),
+                          DetailMediaPlayer(
+                            article: article,
+                            onExternalOpen: () => _openMediaExternal(article),
+                          ),
+                        ],
                         if (article.tags.isNotEmpty) ...[
                           const SizedBox(height: 16),
                           Wrap(
@@ -320,88 +360,100 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
                         ],
                         const SizedBox(height: 22),
                         Divider(
-                        height: 0.5,
-                        color: isDark
-                            ? AppColors.dividerDark
-                            : AppColors.dividerLight,
-                      ),
-                      const SizedBox(height: 22),
-                      ArticleBody(article: article, tocEntries: _tocEntries),
-                      if (article.link != null &&
-                          article.link!.trim().isNotEmpty) ...[
-                        const SizedBox(height: 28),
-                        _OpenOriginalButton(
-                          isDark: isDark,
-                          onTap: () => _openOriginal(article),
+                          height: 0.5,
+                          color: isDark
+                              ? AppColors.dividerDark
+                              : AppColors.dividerLight,
                         ),
+                        const SizedBox(height: 22),
+                        ArticleBody(article: article, tocEntries: _tocEntries),
+                        if (article.link != null &&
+                            article.link!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 28),
+                          _OpenOriginalButton(
+                            isDark: isDark,
+                            onTap: () => _openOriginal(article),
+                          ),
+                        ],
+                        SizedBox(height: 140 + bottom),
                       ],
-                      SizedBox(height: 140 + bottom),
-                    ],
+                    ),
                   ),
                 ),
+              ],
+            ),
+            if (hasToc) EdgeScrubber(entries: _tocEntries),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(12, top + 6, 12, 0),
+                child: Row(
+                  children: [
+                    LiquidGlassIconButton(
+                      icon: Icons.arrow_back_ios_new_rounded,
+                      onTap: () => _leaveDetail(context),
+                    ),
+                    const Spacer(),
+                    LiquidGlassIconButton(
+                      icon: Icons.open_in_browser_rounded,
+                      onTap: () => _openOriginal(article),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-          if (hasToc) EdgeScrubber(entries: _tocEntries),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(12, top + 6, 12, 0),
-              child: Row(
+            ),
+            Positioned(
+              right: 12,
+              bottom: 32 + bottom,
+              child: Column(
                 children: [
-                  LiquidGlassIconButton(
-                    icon: Icons.arrow_back_ios_new_rounded,
-                    onTap: () => _leaveDetail(context),
+                  LiquidGlassCircleAction(
+                    icon: bookmarked
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    label: bookmarked ? 'Saved' : 'Save',
+                    active: bookmarked,
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      ref
+                          .read(articleActionsProvider)
+                          .toggleBookmark(article.id);
+                    },
                   ),
-                  const Spacer(),
-                  LiquidGlassIconButton(
-                    icon: Icons.open_in_browser_rounded,
-                    onTap: () => _openOriginal(article),
+                  const SizedBox(height: 12),
+                  if (article.mediaType == ArticleMediaType.blog)
+                    LiquidGlassCircleAction(
+                      icon: Icons.mode_comment_outlined,
+                      label: commentActivity.isBusy ? '评论中' : '评论',
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        _openComments(article.id);
+                      },
+                    )
+                  else
+                    LiquidGlassCircleAction(
+                      icon: Icons.auto_awesome_rounded,
+                      label: '一起聊',
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        showMediaLlmChat(context, article);
+                      },
+                    ),
+                  const SizedBox(height: 12),
+                  LiquidGlassCircleAction(
+                    icon: Icons.more_horiz_rounded,
+                    label: 'More',
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      _showMoreSheet(context, article);
+                    },
                   ),
                 ],
               ),
             ),
-          ),
-          Positioned(
-            right: 12,
-            bottom: 32 + bottom,
-            child: Column(
-              children: [
-                LiquidGlassCircleAction(
-                  icon: bookmarked
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
-                  label: bookmarked ? 'Saved' : 'Save',
-                  active: bookmarked,
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    ref.read(articleActionsProvider).toggleBookmark(article.id);
-                  },
-                ),
-                const SizedBox(height: 12),
-                LiquidGlassCircleAction(
-                  icon: Icons.mode_comment_outlined,
-                  label: commentActivity.isBusy ? '评论中' : '评论',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    _openComments(article.id);
-                  },
-                ),
-                const SizedBox(height: 12),
-                LiquidGlassCircleAction(
-                  icon: Icons.more_horiz_rounded,
-                  label: 'More',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    _showMoreSheet(context, article);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -421,6 +473,18 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
           ),
           (Icons.ios_share_rounded, '分享', () => _share(article)),
           (Icons.copy_rounded, '复制链接', () => _copyLink(article)),
+          if (article.isMedia)
+            (
+              Icons.play_circle_outline_rounded,
+              '外部打开媒体',
+              () => _openMediaExternal(article),
+            ),
+          if (article.isMedia)
+            (
+              Icons.content_copy_rounded,
+              '复制媒体链接',
+              () => _copyMediaLink(article),
+            ),
           (
             Icons.download_rounded,
             '导出 Markdown',

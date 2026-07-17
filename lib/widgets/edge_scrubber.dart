@@ -5,13 +5,11 @@ import '../core/theme/app_colors.dart';
 
 /// One tick on the left-edge scrubber.
 class ScrubEntry {
-  ScrubEntry({
-    required this.label,
-    this.level = 2,
-    GlobalKey? key,
-  }) : key = key ?? GlobalKey();
+  ScrubEntry({required this.label, this.level = 2, GlobalKey? key})
+    : key = key ?? GlobalKey();
 
   final String label;
+
   /// 1 = longest idle bar, 3 = shortest (visual hierarchy).
   final int level;
   final GlobalKey key;
@@ -36,6 +34,7 @@ class EdgeScrubber extends StatefulWidget {
   });
 
   final List<ScrubEntry> entries;
+
   /// Optional controller of the scroll view being scrubbed (sibling case).
   final ScrollController? scrollController;
   final double cancelDx;
@@ -65,10 +64,8 @@ class _EdgeScrubberState extends State<EdgeScrubber> {
     final scrubBottom = bottom + h * 0.16 + 96;
 
     final barColor = isDark ? Colors.white : Colors.black;
-    final labelBg =
-        isDark ? const Color(0xE6181818) : const Color(0xF2FFFFFF);
-    final labelBorder =
-        isDark ? AppColors.borderDark : AppColors.borderLight;
+    final labelBg = isDark ? const Color(0xE6181818) : const Color(0xF2FFFFFF);
+    final labelBorder = isDark ? AppColors.borderDark : AppColors.borderLight;
 
     final dense = entries.length > 18;
     final veryDense = entries.length > 36;
@@ -158,9 +155,8 @@ class _EdgeScrubberState extends State<EdgeScrubber> {
                     final n = entries.length;
                     final t = n <= 1 ? 0.5 : i / (n - 1);
                     const bubbleMaxH = 56.0;
-                    final topPad =
-                        (t * (constraints.maxHeight - bubbleMaxH))
-                            .clamp(0.0, double.infinity);
+                    final topPad = (t * (constraints.maxHeight - bubbleMaxH))
+                        .clamp(0.0, double.infinity);
                     return Padding(
                       padding: EdgeInsets.only(top: topPad),
                       child: Align(
@@ -178,8 +174,10 @@ class _EdgeScrubberState extends State<EdgeScrubber> {
                             decoration: BoxDecoration(
                               color: labelBg,
                               borderRadius: BorderRadius.circular(10),
-                              border:
-                                  Border.all(color: labelBorder, width: 0.5),
+                              border: Border.all(
+                                color: labelBorder,
+                                width: 0.5,
+                              ),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withValues(alpha: 0.18),
@@ -265,7 +263,8 @@ class _EdgeScrubberState extends State<EdgeScrubber> {
 
     final position = sc.position;
     final t = i / (entries.length - 1);
-    final dest = position.minScrollExtent +
+    final dest =
+        position.minScrollExtent +
         t * (position.maxScrollExtent - position.minScrollExtent);
     await sc.animateTo(
       dest.clamp(position.minScrollExtent, position.maxScrollExtent),
@@ -282,10 +281,7 @@ class _EdgeScrubberState extends State<EdgeScrubber> {
     }
   }
 
-  Future<bool> _ensureVisible(
-    ScrubEntry target, {
-    int durationMs = 320,
-  }) async {
+  Future<bool> _ensureVisible(ScrubEntry target, {int durationMs = 320}) async {
     final ctx = target.key.currentContext;
     if (ctx == null) return false;
     await Scrollable.ensureVisible(
@@ -334,13 +330,13 @@ class _ScrubBar extends StatelessWidget {
     final h = veryDense
         ? (selected ? 2.0 : 1.2)
         : dense
-            ? (selected ? 2.5 : 1.5)
-            : (selected ? 3.5 : 2.0);
+        ? (selected ? 2.5 : 1.5)
+        : (selected ? 3.5 : 2.0);
     final opacity = dimmed
         ? 0.18
         : selected
-            ? 0.92
-            : 0.32;
+        ? 0.92
+        : 0.32;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),

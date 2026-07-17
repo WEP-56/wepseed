@@ -26,7 +26,8 @@ class SetPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider).value ?? const AppSettings();
-    final user = ref.watch(userProfileProvider).value ??
+    final user =
+        ref.watch(userProfileProvider).value ??
         const UserProfile(displayName: '旅人');
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -38,186 +39,186 @@ class SetPage extends ConsumerWidget {
       builder: (context, snap) {
         final version = snap.data?.version ?? '0.0.1';
         return ListView(
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(20, top + 10, 20, 120),
-      children: [
-        Text(
-          'Set',
-          style: theme.textTheme.displayMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.8,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Local only',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: isDark
-                ? AppColors.textTertiaryDark
-                : AppColors.textTertiaryLight,
-          ),
-        ),
-        const SizedBox(height: 22),
-        _Section(
-          title: '常规',
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(20, top + 10, 20, 120),
           children: [
-            _NavTile(
-              icon: Icons.person_outline_rounded,
-              title: '我的形象',
-              subtitle: user.displayName,
-              onTap: () => _openUserEditor(context, controller, user),
-            ),
-            _NavTile(
-              icon: Icons.palette_outlined,
-              title: '外观',
-              subtitle: _themeLabel(settings.themeMode),
-              onTap: () => _openThemePicker(context, controller, settings),
-            ),
-            _NavTile(
-              icon: Icons.text_fields_rounded,
-              title: '阅读字号',
-              subtitle: '${(settings.fontScale * 100).round()}%',
-              onTap: () => _openFontScale(context, controller, settings),
-            ),
-          ],
-        ),
-        _Section(
-          title: 'RSS',
-          children: [
-            _NavTile(
-              icon: Icons.rss_feed_rounded,
-              title: '订阅源',
-              subtitle: _feedsSubtitle(ref),
-              onTap: () => _openFeedsManager(context, ref),
-            ),
-            _NavTile(
-              icon: Icons.add_link_rounded,
-              title: '添加订阅',
-              subtitle: '输入 RSS / Atom URL',
-              onTap: () => _openAddFeed(context, ref),
-            ),
-            _NavTile(
-              icon: Icons.file_upload_outlined,
-              title: '导入 OPML',
-              subtitle: '粘贴 OPML 文本迁入',
-              onTap: () => _openImportOpml(context, ref),
-            ),
-            _NavTile(
-              icon: Icons.file_download_outlined,
-              title: '导出 OPML',
-              subtitle: '复制源列表到剪贴板',
-              onTap: () => _exportOpml(context, ref),
-            ),
-            _NavTile(
-              icon: Icons.sync_rounded,
-              title: '刷新频率',
-              subtitle: '后台每 ${settings.refreshMinutes} 分钟（系统最短约 15 分）',
-              onTap: () => _openRefresh(context, controller, settings),
-            ),
-          ],
-        ),
-        LlmSettingsSection(
-          settings: settings,
-          onToast: (msg) => showAppToast(msg, context: context),
-        ),
-        _Section(
-          title: 'DATA',
-          children: [
-            _SwitchTile(
-              icon: Icons.notifications_none_rounded,
-              title: '更新通知',
-              subtitle: '后台刷到新文时本地提醒',
-              value: settings.notificationsEnabled,
-              onChanged: (v) {
-                controller.updateSettings(
-                  settings.copyWith(notificationsEnabled: v),
-                );
-              },
-            ),
-            _SwitchTile(
-              icon: Icons.wifi_rounded,
-              title: '仅 Wi-Fi 刷新',
-              subtitle: '后台拉源仅走 Wi‑Fi',
-              value: settings.wifiOnly,
-              onChanged: (v) {
-                controller.updateSettings(settings.copyWith(wifiOnly: v));
-              },
-            ),
-            _NavTile(
-              icon: Icons.battery_saver_outlined,
-              title: '后台被杀？',
-              subtitle: '允许自启动 / 无限制电池，周期刷新才稳',
-              onTap: () => showAppToast(
-                '请在系统设置中允许 WEPSEED 后台运行、自启动与通知权限',
-                context: context,
+            Text(
+              'Set',
+              style: theme.textTheme.displayMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.8,
               ),
             ),
-            _NavTile(
-              icon: Icons.cleaning_services_outlined,
-              title: '清理缓存',
-              subtitle: '图片与临时文件',
-              onTap: () => showAppToast('缓存已清理（模拟）', context: context),
+            const SizedBox(height: 4),
+            Text(
+              'Local only',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: isDark
+                    ? AppColors.textTertiaryDark
+                    : AppColors.textTertiaryLight,
+              ),
             ),
-            _NavTile(
-              icon: Icons.ios_share_rounded,
-              title: '导出我的数据',
-              subtitle: '收藏 / 对话 / 设置',
-              onTap: () => showAppToast('数据导出 · 占位', context: context),
+            const SizedBox(height: 22),
+            _Section(
+              title: '常规',
+              children: [
+                _NavTile(
+                  icon: Icons.person_outline_rounded,
+                  title: '我的形象',
+                  subtitle: user.displayName,
+                  onTap: () => _openUserEditor(context, controller, user),
+                ),
+                _NavTile(
+                  icon: Icons.palette_outlined,
+                  title: '外观',
+                  subtitle: _themeLabel(settings.themeMode),
+                  onTap: () => _openThemePicker(context, controller, settings),
+                ),
+                _NavTile(
+                  icon: Icons.text_fields_rounded,
+                  title: '阅读字号',
+                  subtitle: '${(settings.fontScale * 100).round()}%',
+                  onTap: () => _openFontScale(context, controller, settings),
+                ),
+              ],
+            ),
+            _Section(
+              title: 'RSS',
+              children: [
+                _NavTile(
+                  icon: Icons.rss_feed_rounded,
+                  title: '订阅源',
+                  subtitle: _feedsSubtitle(ref),
+                  onTap: () => _openFeedsManager(context, ref),
+                ),
+                _NavTile(
+                  icon: Icons.add_link_rounded,
+                  title: '添加订阅',
+                  subtitle: '输入 RSS / Atom URL',
+                  onTap: () => _openAddFeed(context, ref),
+                ),
+                _NavTile(
+                  icon: Icons.file_upload_outlined,
+                  title: '导入 OPML',
+                  subtitle: '粘贴 OPML 文本迁入',
+                  onTap: () => _openImportOpml(context, ref),
+                ),
+                _NavTile(
+                  icon: Icons.file_download_outlined,
+                  title: '导出 OPML',
+                  subtitle: '复制源列表到剪贴板',
+                  onTap: () => _exportOpml(context, ref),
+                ),
+                _NavTile(
+                  icon: Icons.sync_rounded,
+                  title: '刷新频率',
+                  subtitle: '后台每 ${settings.refreshMinutes} 分钟（系统最短约 15 分）',
+                  onTap: () => _openRefresh(context, controller, settings),
+                ),
+              ],
+            ),
+            LlmSettingsSection(
+              settings: settings,
+              onToast: (msg) => showAppToast(msg, context: context),
+            ),
+            _Section(
+              title: 'DATA',
+              children: [
+                _SwitchTile(
+                  icon: Icons.notifications_none_rounded,
+                  title: '更新通知',
+                  subtitle: '后台刷到新文时本地提醒',
+                  value: settings.notificationsEnabled,
+                  onChanged: (v) {
+                    controller.updateSettings(
+                      settings.copyWith(notificationsEnabled: v),
+                    );
+                  },
+                ),
+                _SwitchTile(
+                  icon: Icons.wifi_rounded,
+                  title: '仅 Wi-Fi 刷新',
+                  subtitle: '后台拉源仅走 Wi‑Fi',
+                  value: settings.wifiOnly,
+                  onChanged: (v) {
+                    controller.updateSettings(settings.copyWith(wifiOnly: v));
+                  },
+                ),
+                _NavTile(
+                  icon: Icons.battery_saver_outlined,
+                  title: '后台被杀？',
+                  subtitle: '允许自启动 / 无限制电池，周期刷新才稳',
+                  onTap: () => showAppToast(
+                    '请在系统设置中允许 WEPSEED 后台运行、自启动与通知权限',
+                    context: context,
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.cleaning_services_outlined,
+                  title: '清理缓存',
+                  subtitle: '图片与临时文件',
+                  onTap: () => showAppToast('缓存已清理（模拟）', context: context),
+                ),
+                _NavTile(
+                  icon: Icons.ios_share_rounded,
+                  title: '导出我的数据',
+                  subtitle: '收藏 / 对话 / 设置',
+                  onTap: () => showAppToast('数据导出 · 占位', context: context),
+                ),
+              ],
+            ),
+            _Section(
+              title: '关于',
+              children: [
+                _NavTile(
+                  icon: Icons.system_update_alt_rounded,
+                  title: '检查更新',
+                  subtitle: '当前 $version',
+                  onTap: () => _openUpdates(context, version),
+                ),
+                _NavTile(
+                  icon: Icons.description_outlined,
+                  title: '用户协议',
+                  subtitle: '在 GitHub 查看',
+                  onTap: () => openExternalUrl(kTermsUrl),
+                ),
+                _NavTile(
+                  icon: Icons.privacy_tip_outlined,
+                  title: '隐私政策',
+                  subtitle: '在 GitHub 查看',
+                  onTap: () => openExternalUrl(kPrivacyUrl),
+                ),
+                _NavTile(
+                  icon: Icons.info_outline_rounded,
+                  title: '关于 WEPSEED',
+                  subtitle: '本地优先的 RSS 阅读器',
+                  onTap: () => _openAbout(context, version),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                'WEPSEED  ·  $version',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: isDark
+                      ? AppColors.textTertiaryDark
+                      : AppColors.textTertiaryLight,
+                  letterSpacing: 1.2,
+                ),
+              ),
             ),
           ],
-        ),
-        _Section(
-          title: '关于',
-          children: [
-            _NavTile(
-              icon: Icons.system_update_alt_rounded,
-              title: '检查更新',
-              subtitle: '当前 $version',
-              onTap: () => _openUpdates(context, version),
-            ),
-            _NavTile(
-              icon: Icons.description_outlined,
-              title: '用户协议',
-              subtitle: '在 GitHub 查看',
-              onTap: () => openExternalUrl(kTermsUrl),
-            ),
-            _NavTile(
-              icon: Icons.privacy_tip_outlined,
-              title: '隐私政策',
-              subtitle: '在 GitHub 查看',
-              onTap: () => openExternalUrl(kPrivacyUrl),
-            ),
-            _NavTile(
-              icon: Icons.info_outline_rounded,
-              title: '关于 WEPSEED',
-              subtitle: '本地优先的 RSS 阅读器',
-              onTap: () => _openAbout(context, version),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Center(
-          child: Text(
-            'WEPSEED  ·  $version',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: isDark
-                  ? AppColors.textTertiaryDark
-                  : AppColors.textTertiaryLight,
-              letterSpacing: 1.2,
-            ),
-          ),
-        ),
-      ],
-    );
+        );
       },
     );
   }
 
   String _themeLabel(ThemeMode mode) => switch (mode) {
-        ThemeMode.system => '跟随系统',
-        ThemeMode.light => '浅色',
-        ThemeMode.dark => '深色',
-      };
+    ThemeMode.system => '跟随系统',
+    ThemeMode.light => '浅色',
+    ThemeMode.dark => '深色',
+  };
 
   String _feedsSubtitle(WidgetRef ref) {
     final feeds = ref.watch(feedsProvider).value;
@@ -572,8 +573,9 @@ class SetPage extends ConsumerWidget {
                   _PrimaryButton(
                     label: '应用',
                     onTap: () async {
-                      await controller
-                          .updateSettings(settings.copyWith(fontScale: scale));
+                      await controller.updateSettings(
+                        settings.copyWith(fontScale: scale),
+                      );
                       if (context.mounted) Navigator.pop(context);
                     },
                   ),
@@ -615,8 +617,9 @@ class SetPage extends ConsumerWidget {
       },
     );
     if (selected != null) {
-      await controller
-          .updateSettings(settings.copyWith(refreshMinutes: selected));
+      await controller.updateSettings(
+        settings.copyWith(refreshMinutes: selected),
+      );
     }
   }
 
@@ -649,8 +652,9 @@ class SetPage extends ConsumerWidget {
                   shape: BoxShape.circle,
                   color: isDark ? AppColors.inkCard : AppColors.wash,
                   border: Border.all(
-                    color:
-                        isDark ? AppColors.borderDark : AppColors.borderLight,
+                    color: isDark
+                        ? AppColors.borderDark
+                        : AppColors.borderLight,
                   ),
                 ),
                 child: Text(
@@ -663,8 +667,9 @@ class SetPage extends ConsumerWidget {
               const SizedBox(height: 12),
               Text(
                 'WEPSEED',
-                style: theme.textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -795,10 +800,7 @@ class _UpdateSheetState extends State<_UpdateSheet> {
       );
       if (!mounted) return;
       if (openResult.type != ResultType.done) {
-        showAppToast(
-          '无法打开安装器：${openResult.message}',
-          context: context,
-        );
+        showAppToast('无法打开安装器：${openResult.message}', context: context);
         await openExternalUrl(asset.downloadUrl);
       } else {
         showAppToast('请按系统提示完成安装', context: context);
@@ -806,7 +808,8 @@ class _UpdateSheetState extends State<_UpdateSheet> {
     } catch (e) {
       if (mounted) {
         showAppToast('下载失败：$e', context: context);
-        final url = _service.pickApkAsset(latest)?.downloadUrl ?? latest.htmlUrl;
+        final url =
+            _service.pickApkAsset(latest)?.downloadUrl ?? latest.htmlUrl;
         await openExternalUrl(url);
       }
     } finally {
@@ -858,10 +861,7 @@ class _UpdateSheetState extends State<_UpdateSheet> {
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
-            _PrimaryButton(
-              label: '好的',
-              onTap: () => Navigator.pop(context),
-            ),
+            _PrimaryButton(label: '好的', onTap: () => Navigator.pop(context)),
           ] else if (_result?.latest != null) ...[
             Text(
               '发现新版本 ${_result!.latest!.version}',
@@ -1093,8 +1093,9 @@ class _SheetScaffold extends StatelessWidget {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 14),
                 decoration: BoxDecoration(
-                  color: (isDark ? Colors.white : Colors.black)
-                      .withValues(alpha: 0.12),
+                  color: (isDark ? Colors.white : Colors.black).withValues(
+                    alpha: 0.12,
+                  ),
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -1126,8 +1127,9 @@ class _PrimaryButton extends StatelessWidget {
         style: FilledButton.styleFrom(
           backgroundColor: isDark ? AppColors.white : AppColors.black,
           foregroundColor: isDark ? AppColors.black : AppColors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           elevation: 0,
         ),
         child: Text(label),

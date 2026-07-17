@@ -1,25 +1,40 @@
-import 'dart:math';
-
 import 'package:drift/drift.dart';
 
 import '../../core/config/app_flags.dart';
+import '../comments/comment_generation_engine.dart';
+import '../comments/comment_job_models.dart';
 import '../db/app_database.dart';
 import '../llm/llm_client.dart';
 import '../llm/llm_prompt.dart';
 import '../llm/llm_resolve.dart';
 import '../llm/llm_text_sanitize.dart';
 import '../models/models.dart';
+import 'comment_job_repository.dart';
+import 'comment_job_repository_impl.dart';
 import 'comment_repository.dart';
 import 'llm_provider_repository.dart';
 import 'warm_event_repository.dart';
 
 class CommentRepositoryImpl implements CommentRepository {
-  CommentRepositoryImpl(this._db, {WarmEventRepository? warmEvents})
-    : _warmEvents = warmEvents;
+  CommentRepositoryImpl(
+    this._db, {
+    WarmEventRepository? warmEvents,
+    CommentJobRepository? jobs,
+    CommentGenerationEngine? engine,
+    String leaseOwner = 'ui',
+  }) : _warmEvents = warmEvents,
+       _jobs = jobs ?? CommentJobRepositoryImpl(_db),
+       _leaseOwner = leaseOwner {
+    _engine = engine ?? CommentGenerationEngine(db: _db, jobs: _jobs);
+  }
 
   final AppDatabase _db;
   final WarmEventRepository? _warmEvents;
-  final _rng = Random();
+  final CommentJobRepository _jobs;
+  late final CommentGenerationEngine _engine;
+  final String _leaseOwner;
+
+  CommentJobRepository get jobs => _jobs;
 
   @override
   Stream<List<Comment>> watchForArticle(String articleId) {
@@ -32,11 +47,13 @@ class CommentRepositoryImpl implements CommentRepository {
 
   @override
   Future<void> clearAll() async {
+    await _jobs.cancelAllJobs();
     await _db.delete(_db.comments).go();
   }
 
   @override
   Future<void> clearForArticle(String articleId) async {
+    await _jobs.cancelJobsForArticle(articleId);
     await (_db.delete(
       _db.comments,
     )..where((t) => t.articleId.equals(articleId))).go();
@@ -58,11 +75,37 @@ class CommentRepositoryImpl implements CommentRepository {
     if (trigger == CommentTrigger.off) {
       return const CommentGenerationResult(total: 0, generated: 0);
     }
+    if (llmClient == null || llmRepo == null) {
+      return const CommentGenerationResult(total: 0, generated: 0);
+    }
 
-    final existing = await (_db.select(
-      _db.comments,
-    )..where((t) => t.articleId.equals(articleId))).get();
-    if (existing.isNotEmpty) {
+    // Resume open durable job (partial kill recovery).
+    var open = await _jobs.getOpenJobForArticle(articleId);
+    if (open != null) {
+      return _engine.runJob(
+        jobId: open.id,
+        owner: _leaseOwner,
+        article: article,
+        pool: pool,
+        providers: providers,
+        models: models,
+        llmRepo: llmRepo,
+        llmClient: llmClient,
+        forceMock: forceMock,
+        onProgress: onProgress,
+      );
+    }
+
+    // Legacy / completed: any netizen top-level comment without open job → done.
+    final existingTop =
+        await (_db.select(_db.comments)..where(
+              (t) =>
+                  t.articleId.equals(articleId) &
+                  t.authorType.equals('netizen') &
+                  t.parentId.isNull(),
+            ))
+            .get();
+    if (existingTop.isNotEmpty) {
       return const CommentGenerationResult(
         total: 0,
         generated: 0,
@@ -70,81 +113,108 @@ class CommentRepositoryImpl implements CommentRepository {
       );
     }
 
-    final enabled = pool.where((n) => n.isEnabled).toList();
-    if (enabled.isEmpty) {
+    final picked = _engine.sampleNetizens(pool);
+    if (picked.isEmpty) {
       return const CommentGenerationResult(total: 0, generated: 0);
     }
 
-    final picked = <Netizen>[];
-    for (final n in enabled) {
-      if (_rng.nextDouble() < n.weight.clamp(0.0, 1.0)) {
-        picked.add(n);
+    final job = await _jobs.createJob(
+      articleId: articleId,
+      trigger: trigger,
+      pickedNetizenIds: picked.map((n) => n.id).toList(),
+    );
+
+    return _engine.runJob(
+      jobId: job.id,
+      owner: _leaseOwner,
+      article: article,
+      pool: pool,
+      providers: providers,
+      models: models,
+      llmRepo: llmRepo,
+      llmClient: llmClient,
+      forceMock: forceMock,
+      onProgress: onProgress,
+    );
+  }
+
+  /// UI retry: reopen failed job, or create a new one if comments were cleared.
+  Future<CommentGenerationResult> retryGeneration(
+    String articleId, {
+    required CommentTrigger trigger,
+    required List<Netizen> pool,
+    required Article article,
+    required List<LlmProvider> providers,
+    required List<LlmModel> models,
+    required LlmProviderRepository llmRepo,
+    required LlmClient llmClient,
+    bool forceMock = false,
+    void Function(CommentGenerationProgress progress)? onProgress,
+  }) async {
+    if (trigger == CommentTrigger.off) {
+      return const CommentGenerationResult(total: 0, generated: 0);
+    }
+
+    final open = await _jobs.getOpenJobForArticle(articleId);
+    if (open != null) {
+      return _engine.runJob(
+        jobId: open.id,
+        owner: _leaseOwner,
+        article: article,
+        pool: pool,
+        providers: providers,
+        models: models,
+        llmRepo: llmRepo,
+        llmClient: llmClient,
+        forceMock: forceMock,
+        onProgress: onProgress,
+      );
+    }
+
+    // Latest failed job for article?
+    final failedRows =
+        await (_db.select(_db.commentJobs)
+              ..where(
+                (t) =>
+                    t.articleId.equals(articleId) &
+                    t.status.equals(
+                      commentJobStatusToDb(CommentJobStatus.failed),
+                    ),
+              )
+              ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+              ..limit(1))
+            .get();
+    if (failedRows.isNotEmpty) {
+      final reopened = await _jobs.reopenFailedJob(failedRows.first.id);
+      if (reopened != null) {
+        return _engine.runJob(
+          jobId: reopened.id,
+          owner: _leaseOwner,
+          article: article,
+          pool: pool,
+          providers: providers,
+          models: models,
+          llmRepo: llmRepo,
+          llmClient: llmClient,
+          forceMock: forceMock,
+          onProgress: onProgress,
+        );
       }
     }
-    if (picked.isEmpty) {
-      picked.add(_weightedChoice(enabled));
-    }
 
-    final useMock = forceMock || kUseMockComments;
-    final now = DateTime.now();
-    var generated = 0;
-    await Future.wait([
-      for (final entry in picked.indexed)
-        () async {
-          final (index, n) = entry;
-          var reported = false;
-          final content = await _topLevelContent(
-            netizen: n,
-            article: article,
-            useMock: useMock,
-            providers: providers,
-            models: models,
-            llmRepo: llmRepo,
-            llmClient: llmClient,
-            onQueuePhase: (phase) {
-              reported = true;
-              onProgress?.call(
-                CommentGenerationProgress(
-                  netizenName: n.name,
-                  phase: phase,
-                  total: picked.length,
-                ),
-              );
-            },
-          );
-          // No Key / unresolved → skip (do not plant mock/error filler).
-          if (content == null || content.trim().isEmpty) {
-            if (!reported) {
-              onProgress?.call(
-                CommentGenerationProgress(
-                  netizenName: n.name,
-                  phase: LlmQueuePhase.failed,
-                  total: picked.length,
-                ),
-              );
-            }
-            return;
-          }
-
-          final id =
-              'c_${articleId}_${n.id}_${now.microsecondsSinceEpoch}_$index';
-          await _db
-              .into(_db.comments)
-              .insert(
-                CommentsCompanion.insert(
-                  id: id,
-                  articleId: articleId,
-                  authorType: 'netizen',
-                  netizenId: Value(n.id),
-                  content: content.trim(),
-                  // Preserve actual arrival order when concurrency > 1.
-                  createdAt: DateTime.now(),
-                ),
-              );
-          generated++;
-        }(),
-    ]);
-    return CommentGenerationResult(total: picked.length, generated: generated);
+    // No job / already completed with empty UI → normal ensure path.
+    return ensureGenerated(
+      articleId,
+      trigger: trigger,
+      pool: pool,
+      article: article,
+      providers: providers,
+      models: models,
+      llmRepo: llmRepo,
+      llmClient: llmClient,
+      forceMock: forceMock,
+      onProgress: onProgress,
+    );
   }
 
   @override
@@ -243,45 +313,6 @@ class CommentRepositoryImpl implements CommentRepository {
     return CommentReplyResult(netizenName: netizen.name, replied: true);
   }
 
-  /// Returns null when generation is skipped (no Key / not configured).
-  Future<String?> _topLevelContent({
-    required Netizen netizen,
-    required Article article,
-    required bool useMock,
-    required List<LlmProvider> providers,
-    required List<LlmModel> models,
-    LlmProviderRepository? llmRepo,
-    LlmClient? llmClient,
-    void Function(LlmQueuePhase phase)? onQueuePhase,
-  }) async {
-    if (useMock) {
-      return _devMockTopLevel(netizen, article);
-    }
-    if (llmClient == null || llmRepo == null) return null;
-
-    final cfg = await resolveLlmConfigForNetizen(
-      netizen: netizen,
-      llmRepo: llmRepo,
-      providers: providers,
-      allModels: models,
-    );
-    if (cfg == null) return null;
-
-    try {
-      final text = await llmClient.complete(
-        netizenTopLevelMessages(netizen: netizen, article: article),
-        cfg.copyWith(onQueuePhase: onQueuePhase),
-      );
-      final cleaned = sanitizeLlmCommentText(text);
-      if (cleaned.isNotEmpty) return cleaned;
-      return null;
-    } on LlmException {
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
-
   Future<String?> _replyContent({
     required Netizen netizen,
     required Article article,
@@ -295,7 +326,7 @@ class CommentRepositoryImpl implements CommentRepository {
     void Function(LlmQueuePhase phase)? onQueuePhase,
   }) async {
     if (useMock) {
-      return _devMockReply(netizen, userText);
+      return '（mock）${netizen.name}：收到「${_short(userText, 18)}」';
     }
     if (llmClient == null || llmRepo == null) return null;
 
@@ -325,28 +356,6 @@ class CommentRepositoryImpl implements CommentRepository {
     } catch (_) {
       return null;
     }
-  }
-
-  Netizen _weightedChoice(List<Netizen> list) {
-    final positive = list.where((n) => n.weight > 0).toList();
-    final pool = positive.isEmpty ? list : positive;
-    final total = pool.fold<double>(0, (s, n) => s + n.weight.clamp(0.01, 1.0));
-    var r = _rng.nextDouble() * total;
-    for (final n in pool) {
-      r -= n.weight.clamp(0.01, 1.0);
-      if (r <= 0) return n;
-    }
-    return pool.last;
-  }
-
-  /// Only used when [kUseMockComments] / forceMock (tests / offline demo).
-  String _devMockTopLevel(Netizen n, Article article) {
-    final summary = article.summary.isEmpty ? article.title : article.summary;
-    return '「${n.name}」${n.styleLabel ?? ""}：${_short(summary, 64)}';
-  }
-
-  String _devMockReply(Netizen n, String userText) {
-    return '（mock）${n.name}：收到「${_short(userText, 18)}」';
   }
 
   static String _short(String s, [int n = 12]) {

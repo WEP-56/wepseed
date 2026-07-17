@@ -73,6 +73,12 @@ class _FakeCommentController implements CommentController {
   Future<void> retryGeneration(String articleId) async {}
 
   @override
+  Future<void> hydrateActivity(String articleId) async {}
+
+  @override
+  Future<void> recoverPendingJobs() async {}
+
+  @override
   Future<void> clearAllComments() async {}
 
   @override

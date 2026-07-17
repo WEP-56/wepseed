@@ -34,6 +34,11 @@ class Articles extends Table {
   TextColumn get contentHtml => text().nullable()();
   TextColumn get contentText => text().withDefault(const Constant(''))();
   TextColumn get imageUrl => text().nullable()();
+  TextColumn get mediaType => text().withDefault(const Constant('blog'))();
+  TextColumn get enclosureUrl => text().nullable()();
+  TextColumn get enclosureMime => text().nullable()();
+  IntColumn get enclosureLength => integer().nullable()();
+  IntColumn get durationSeconds => integer().nullable()();
   RealColumn get imageAspect => real().withDefault(const Constant(1.0))();
   BoolColumn get featured => boolean().withDefault(const Constant(false))();
   TextColumn get tagsJson => text().withDefault(const Constant('[]'))();
@@ -135,9 +140,9 @@ class AppSettingsRows extends Table {
   BoolColumn get useMockFeed => boolean().withDefault(const Constant(true))();
   TextColumn get commentTrigger =>
       text().withDefault(const Constant('onOpenComments'))();
+
   /// New-page stream filter JSON: {onlyToday, onlyUnread, feedIds}.
-  TextColumn get feedFilterJson =>
-      text().withDefault(const Constant('{}'))();
+  TextColumn get feedFilterJson => text().withDefault(const Constant('{}'))();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
@@ -203,6 +208,52 @@ class Comments extends Table {
   TextColumn get parentId => text().nullable()();
   TextColumn get content => text()();
   DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Durable top-level comment generation (D-task). Survives process death.
+@DataClassName('CommentJobRow')
+class CommentJobs extends Table {
+  TextColumn get id => text()();
+  TextColumn get articleId => text()();
+
+  /// pending | running | completed | failed | cancelled
+  TextColumn get status => text()();
+
+  /// off | onBrowse | onOpenComments
+  TextColumn get trigger => text()();
+
+  /// JSON array of netizen ids sampled once for this job.
+  TextColumn get pickedNetizenIdsJson =>
+      text().withDefault(const Constant('[]'))();
+  IntColumn get attempt => integer().withDefault(const Constant(0))();
+  IntColumn get maxAttempts => integer().withDefault(const Constant(3))();
+  TextColumn get lastError => text().nullable()();
+  TextColumn get leaseOwner => text().nullable()();
+  DateTimeColumn get leaseUntil => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@DataClassName('CommentJobItemRow')
+class CommentJobItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get jobId => text().references(CommentJobs, #id)();
+  TextColumn get netizenId => text()();
+
+  /// pending | running | succeeded | skipped | failed
+  TextColumn get status => text()();
+  IntColumn get attempt => integer().withDefault(const Constant(0))();
+  TextColumn get lastError => text().nullable()();
+  TextColumn get commentId => text().nullable()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

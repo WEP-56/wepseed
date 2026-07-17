@@ -146,9 +146,7 @@ class _SourceFeedPageState extends ConsumerState<SourceFeedPage> {
 
     if (source == null) {
       return Scaffold(
-        body: Center(
-          child: Text('源不存在', style: theme.textTheme.titleMedium),
-        ),
+        body: Center(child: Text('源不存在', style: theme.textTheme.titleMedium)),
       );
     }
 
@@ -218,9 +216,7 @@ class _SourceFeedPageState extends ConsumerState<SourceFeedPage> {
                       children: [
                         _MetaPill(label: '${articles.length} 篇'),
                         const SizedBox(width: 8),
-                        _MetaPill(
-                          label: source.isPaused ? '已暂停' : '已订阅',
-                        ),
+                        _MetaPill(label: source.isPaused ? '已暂停' : '已订阅'),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -289,9 +285,9 @@ class _MetaPill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }

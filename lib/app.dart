@@ -23,21 +23,40 @@ void _openDeepLink(GoRouter router, String route) {
   router.push(route);
 }
 
-class WepseedApp extends ConsumerWidget {
+class WepseedApp extends ConsumerStatefulWidget {
   const WepseedApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WepseedApp> createState() => _WepseedAppState();
+}
+
+class _WepseedAppState extends ConsumerState<WepseedApp> {
+  var _commentJobsRecovered = false;
+
+  void _maybeRecoverCommentJobs() {
+    if (_commentJobsRecovered) return;
+    _commentJobsRecovered = true;
+    unawaited(ref.read(commentControllerProvider).recoverPendingJobs());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
     final settings = settingsAsync.value ?? const AppSettings();
     final router = ref.watch(goRouterProvider);
 
+    // D-task: one-shot resume of open comment jobs after cold start.
     ref.listen(settingsProvider, (previous, next) {
-      final settings = next.value;
-      if (settings != null && settings != previous?.value) {
-        unawaited(BackgroundRefreshService.configure(settings));
+      if (next.hasValue) _maybeRecoverCommentJobs();
+      final s = next.value;
+      if (s != null && s != previous?.value) {
+        unawaited(BackgroundRefreshService.configure(s));
       }
     });
+    if (settingsAsync.hasValue) {
+      _maybeRecoverCommentJobs();
+    }
+
     ref.listen(notificationRouteProvider, (previous, next) {
       final route = next.value;
       if (route == null) return;

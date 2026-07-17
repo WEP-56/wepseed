@@ -10,6 +10,7 @@ import '../../data/db/app_database.dart';
 import '../../data/models/models.dart';
 import '../../data/repositories/drift_feed_repository.dart';
 import '../../data/repositories/settings_repository_impl.dart';
+import 'comment_job_worker.dart';
 import 'notification_service.dart';
 
 /// Unique name for [Workmanager.registerPeriodicTask] (enqueue identity).
@@ -27,18 +28,23 @@ const _rssTag = 'wepseed.rss';
 @pragma('vm:entry-point')
 void backgroundCallbackDispatcher() {
   Workmanager().executeTask((taskName, inputData) async {
-    // Future comment jobs will use other task names; never fail the worker.
-    if (taskName != kRssRefreshTaskName) return true;
+    // Unknown tasks must not fail the worker.
+    if (taskName != kRssRefreshTaskName && taskName != kCommentJobTaskName) {
+      return true;
+    }
 
     // executeTask already ensures binding; still register plugins so
-    // path_provider / sqlite / notifications work in this isolate.
+    // path_provider / sqlite / notifications / secure_storage work here.
     DartPluginRegistrant.ensureInitialized();
 
     try {
+      if (taskName == kCommentJobTaskName) {
+        return await runCommentJobsDrain();
+      }
       await NotificationService.instance.initialize();
       return await runRssRefreshJob();
     } catch (e, st) {
-      debugPrint('wepseed RSS background task failed: $e\n$st');
+      debugPrint('wepseed background task ($taskName) failed: $e\n$st');
       return false;
     }
   });

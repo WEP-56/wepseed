@@ -88,10 +88,12 @@ class _NavIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final active =
-        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final idle =
-        isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight;
+    final active = isDark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final idle = isDark
+        ? AppColors.textTertiaryDark
+        : AppColors.textTertiaryLight;
 
     return Expanded(
       child: GestureDetector(
@@ -108,11 +110,12 @@ class _NavIcon extends StatelessWidget {
               shape: BoxShape.circle,
               color: selected
                   ? (isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.black.withValues(alpha: 0.05))
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.black.withValues(alpha: 0.05))
                   : Colors.transparent,
             ),
-            child: child ??
+            child:
+                child ??
                 Icon(
                   selected ? (activeIcon ?? icon) : icon,
                   size: 20,

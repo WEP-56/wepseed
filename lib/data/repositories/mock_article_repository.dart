@@ -9,13 +9,11 @@ import 'warm_event_repository.dart';
 /// Read / bookmark / unread state is session-scoped in Phase A.
 class MockArticleRepository implements ArticleRepository {
   MockArticleRepository({WarmEventRepository? warmEvents})
-      : _warmEvents = warmEvents {
+    : _warmEvents = warmEvents {
     _articles = MockData.articles();
     _readIds = {'a5', 'a7', 'a11'};
     _bookmarkedIds = {'a2', 'a9'};
-    _unreadBySource = {
-      for (final s in MockData.sources) s.id: 0,
-    };
+    _unreadBySource = {for (final s in MockData.sources) s.id: 0};
     _unreadBySource['s1'] = 3;
     _unreadBySource['s3'] = 1;
     _unreadBySource['s4'] = 5;
@@ -54,9 +52,7 @@ class MockArticleRepository implements ArticleRepository {
   Stream<List<Article>> watchTimeline({String? feedId}) async* {
     List<Article> filter(List<Article> all) {
       if (feedId == null) return List.unmodifiable(all);
-      return List.unmodifiable(
-        all.where((a) => a.source.id == feedId),
-      );
+      return List.unmodifiable(all.where((a) => a.source.id == feedId));
     }
 
     yield filter(_articles);
@@ -92,8 +88,8 @@ class MockArticleRepository implements ArticleRepository {
   @override
   Stream<List<Article>> watchBookmarkedArticles() async* {
     List<Article> pick() => List.unmodifiable(
-          _articles.where((a) => _bookmarkedIds.contains(a.id)),
-        );
+      _articles.where((a) => _bookmarkedIds.contains(a.id)),
+    );
     yield pick();
     yield* _timelineController.stream.map((_) => pick());
   }

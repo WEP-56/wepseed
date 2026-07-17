@@ -20,12 +20,13 @@ class MePage extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
     final top = MediaQuery.paddingOf(context).top;
     final events = ref.watch(meTimelineProvider).value ?? const [];
-    final user = ref.watch(userProfileProvider).value ??
+    final user =
+        ref.watch(userProfileProvider).value ??
         const UserProfile(displayName: '旅人');
-    final netizenCount =
-        (ref.watch(netizensProvider).value ?? const []).where((n) => n.isEnabled).length;
-    final bookmarks =
-        ref.watch(bookmarkedIdsProvider).value?.length ?? 0;
+    final netizenCount = (ref.watch(netizensProvider).value ?? const [])
+        .where((n) => n.isEnabled)
+        .length;
+    final bookmarks = ref.watch(bookmarkedIdsProvider).value?.length ?? 0;
     final grouped = _groupByDay(events);
 
     return CustomScrollView(
@@ -194,19 +195,11 @@ class _StatsRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _StatChip(
-            label: '对话',
-            value: '$chats',
-            onTap: onChats,
-          ),
+          child: _StatChip(label: '对话', value: '$chats', onTap: onChats),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _StatChip(
-            label: '痕迹',
-            value: '$moments',
-            onTap: onTraces,
-          ),
+          child: _StatChip(label: '痕迹', value: '$moments', onTap: onTraces),
         ),
       ],
     );
@@ -296,7 +289,9 @@ class _DaySection extends StatelessWidget {
               style: theme.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.2,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
           ),
@@ -324,7 +319,9 @@ class _DaySection extends StatelessWidget {
                             child: Container(
                               width: 1,
                               margin: const EdgeInsets.symmetric(vertical: 4),
-                              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                              color: isDark
+                                  ? AppColors.borderDark
+                                  : AppColors.borderLight,
                             ),
                           ),
                       ],
@@ -431,10 +428,10 @@ class _EventCard extends StatelessWidget {
   }
 
   String _typeLabel(MeEventType type) => switch (type) {
-        MeEventType.dwell => '驻留',
-        MeEventType.binge => '连读',
-        MeEventType.streak => '连续',
-        MeEventType.nightOwl => '夜读',
-        _ => '',
-      };
+    MeEventType.dwell => '驻留',
+    MeEventType.binge => '连读',
+    MeEventType.streak => '连续',
+    MeEventType.nightOwl => '夜读',
+    _ => '',
+  };
 }

@@ -16,12 +16,9 @@ import 'feed_repository.dart';
 /// **Delete policy:** hard-delete feed row, then cascade-delete its articles
 /// (comments are not FK-bound to articles; orphan comments may remain until C).
 class DriftFeedRepository implements FeedRepository {
-  DriftFeedRepository(
-    this._db, {
-    RssClient? client,
-    RssParser? parser,
-  })  : _client = client ?? RssClient(),
-        _parser = parser ?? RssParser();
+  DriftFeedRepository(this._db, {RssClient? client, RssParser? parser})
+    : _client = client ?? RssClient(),
+      _parser = parser ?? RssParser();
 
   final AppDatabase _db;
   final RssClient _client;
@@ -41,17 +38,18 @@ class DriftFeedRepository implements FeedRepository {
 
   @override
   Future<FeedSource?> getFeed(String id) async {
-    final row = await (_db.select(_db.feeds)..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.feeds,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     return row == null ? null : _mapFeed(row);
   }
 
   @override
   Future<void> addFeed(String url) async {
     final normalized = _normalizeUrl(url);
-    final existing = await (_db.select(_db.feeds)
-          ..where((t) => t.url.equals(normalized)))
-        .getSingleOrNull();
+    final existing = await (_db.select(
+      _db.feeds,
+    )..where((t) => t.url.equals(normalized))).getSingleOrNull();
     if (existing != null) {
       await refreshFeed(existing.id);
       return;
@@ -66,7 +64,9 @@ class DriftFeedRepository implements FeedRepository {
     final id = _feedIdForUrl(normalized);
     final siteUrl = parsed.siteUrl ?? _origin(normalized);
 
-    await _db.into(_db.feeds).insert(
+    await _db
+        .into(_db.feeds)
+        .insert(
           FeedsCompanion.insert(
             id: id,
             title: parsed.title,
@@ -98,8 +98,9 @@ class DriftFeedRepository implements FeedRepository {
 
   @override
   Future<void> refreshFeed(String id) async {
-    final row = await (_db.select(_db.feeds)..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.feeds,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
     if (row.isPaused) return;
     await _refreshRow(row);
@@ -112,8 +113,7 @@ class DriftFeedRepository implements FeedRepository {
   }) async {
     // wifiOnly is honored by background worker (Phase E); UI refresh ignores it.
     final scoped = feedIds?.where((id) => id.isNotEmpty).toSet();
-    final query = _db.select(_db.feeds)
-      ..where((t) => t.isPaused.equals(false));
+    final query = _db.select(_db.feeds)..where((t) => t.isPaused.equals(false));
     if (scoped != null && scoped.isNotEmpty) {
       query.where((t) => t.id.isIn(scoped));
     }
@@ -148,18 +148,12 @@ class DriftFeedRepository implements FeedRepository {
 
   @override
   Future<String> exportOpml() async {
-    final rows = await (_db.select(_db.feeds)
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
-        .get();
+    final rows = await (_db.select(
+      _db.feeds,
+    )..orderBy([(t) => OrderingTerm.asc(t.createdAt)])).get();
     return Opml.export(
       rows
-          .map(
-            (r) => (
-              title: r.title,
-              xmlUrl: r.url,
-              htmlUrl: r.siteUrl,
-            ),
-          )
+          .map((r) => (title: r.title, xmlUrl: r.url, htmlUrl: r.siteUrl))
           .toList(),
     );
   }
@@ -199,16 +193,16 @@ class DriftFeedRepository implements FeedRepository {
     required DateTime fetchedAt,
   }) async {
     for (final item in items) {
-      final existing = await (_db.select(_db.articles)
-            ..where(
-              (t) => t.feedId.equals(feedId) & t.guid.equals(item.guid),
-            ))
-          .getSingleOrNull();
+      final existing =
+          await (_db.select(_db.articles)..where(
+                (t) => t.feedId.equals(feedId) & t.guid.equals(item.guid),
+              ))
+              .getSingleOrNull();
 
       if (existing != null) {
-        await (_db.update(_db.articles)
-              ..where((t) => t.id.equals(existing.id)))
-            .write(
+        await (_db.update(
+          _db.articles,
+        )..where((t) => t.id.equals(existing.id))).write(
           ArticlesCompanion(
             link: Value(item.link),
             title: Value(item.title),
@@ -217,13 +211,20 @@ class DriftFeedRepository implements FeedRepository {
             contentHtml: Value(item.contentHtml),
             contentText: Value(item.contentText),
             imageUrl: Value(item.imageUrl ?? existing.imageUrl),
+            mediaType: Value(articleMediaTypeToDb(item.mediaType)),
+            enclosureUrl: Value(item.enclosureUrl),
+            enclosureMime: Value(item.enclosureMime),
+            enclosureLength: Value(item.enclosureLength),
+            durationSeconds: Value(item.durationSeconds),
             publishedAt: Value(item.publishedAt),
             fetchedAt: Value(fetchedAt),
           ),
         );
       } else {
         final id = _articleId(feedId, item.guid);
-        await _db.into(_db.articles).insert(
+        await _db
+            .into(_db.articles)
+            .insert(
               ArticlesCompanion.insert(
                 id: id,
                 feedId: feedId,
@@ -235,6 +236,11 @@ class DriftFeedRepository implements FeedRepository {
                 contentHtml: Value(item.contentHtml),
                 contentText: Value(item.contentText),
                 imageUrl: Value(item.imageUrl),
+                mediaType: Value(articleMediaTypeToDb(item.mediaType)),
+                enclosureUrl: Value(item.enclosureUrl),
+                enclosureMime: Value(item.enclosureMime),
+                enclosureLength: Value(item.enclosureLength),
+                durationSeconds: Value(item.durationSeconds),
                 publishedAt: item.publishedAt,
                 fetchedAt: fetchedAt,
               ),

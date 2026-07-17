@@ -9,15 +9,17 @@ final llmProvidersListProvider = StreamProvider<List<LlmProvider>>((ref) {
 
 final llmModelsForProviderProvider =
     StreamProvider.family<List<LlmModel>, String>((ref, providerId) {
-  return ref.watch(llmProviderRepositoryProvider).watchModels(providerId);
-});
+      return ref.watch(llmProviderRepositoryProvider).watchModels(providerId);
+    });
 
 final allLlmModelsProvider = FutureProvider<List<LlmModel>>((ref) {
   return ref.watch(llmProviderRepositoryProvider).getAllModels();
 });
 
-final providerHasKeyProvider =
-    FutureProvider.family<bool, String>((ref, providerId) {
+final providerHasKeyProvider = FutureProvider.family<bool, String>((
+  ref,
+  providerId,
+) {
   return ref.watch(llmProviderRepositoryProvider).hasApiKey(providerId);
 });
 

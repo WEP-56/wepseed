@@ -25,7 +25,8 @@ List<LlmMessage> netizenTopLevelMessages({
   final style = netizen.styleLabel?.trim();
   final persona = netizen.systemHint.trim();
 
-  final system = '''
+  final system =
+      '''
 $kWepseedCommentScene
 
 【角色】
@@ -46,7 +47,8 @@ ${persona.isEmpty ? '（无额外人设，保持自然短评）' : persona}
 - 不要解释你将如何评论，直接评论
 ''';
 
-  final user = '''
+  final user =
+      '''
 请为下面这篇订阅文章写一条顶层评论。
 
 订阅源：${article.source.name}
@@ -73,7 +75,8 @@ List<LlmMessage> netizenReplyMessages({
   final style = netizen.styleLabel?.trim();
   final persona = netizen.systemHint.trim();
 
-  final system = '''
+  final system =
+      '''
 $kWepseedCommentScene
 
 【角色】
@@ -92,7 +95,8 @@ ${persona.isEmpty ? '（无额外人设）' : persona}
 - **只输出最终跟帖正文**；禁止思考过程、工具调用、标签或自言自语
 ''';
 
-  final user = '''
+  final user =
+      '''
 文章：《${article.title}》（源：${article.source.name}）
 摘录：$excerpt
 
@@ -123,7 +127,10 @@ String _articleExcerpt(Article article, {int maxChars = 1800}) {
 
 String _stripHtml(String html) {
   return html
-      .replaceAll(RegExp(r'<script[\s\S]*?</script>', caseSensitive: false), ' ')
+      .replaceAll(
+        RegExp(r'<script[\s\S]*?</script>', caseSensitive: false),
+        ' ',
+      )
       .replaceAll(RegExp(r'<style[\s\S]*?</style>', caseSensitive: false), ' ')
       .replaceAll(RegExp(r'<[^>]+>'), ' ')
       .replaceAll(RegExp(r'&nbsp;'), ' ')

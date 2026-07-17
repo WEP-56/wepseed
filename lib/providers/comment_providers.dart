@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/background/comment_job_worker.dart';
 import '../core/config/app_flags.dart';
+import '../data/comments/comment_job_models.dart';
 import '../data/llm/llm_client.dart';
 import '../data/models/models.dart';
 import '../data/repositories/comment_repository.dart';
+import '../data/repositories/comment_repository_impl.dart';
 import 'core_providers.dart';
 
 final commentsForArticleProvider = StreamProvider.family<List<Comment>, String>(
@@ -256,6 +261,29 @@ class CommentActivityNotifier extends Notifier<Map<String, CommentActivity>> {
       ),
     );
   }
+
+  /// Restore busy UI from durable job snapshot after process death.
+  void hydrateFromJob({
+    required String articleId,
+    required int total,
+    required int completed,
+    required int failed,
+    required Set<String> queuedNetizens,
+    required Set<String> activeNetizens,
+  }) {
+    _set(
+      articleId,
+      _for(articleId).copyWith(
+        isPreparing: queuedNetizens.isEmpty && activeNetizens.isEmpty,
+        isGenerating: true,
+        total: total,
+        completed: completed,
+        failed: failed,
+        queuedNetizens: queuedNetizens,
+        activeNetizens: activeNetizens,
+      ),
+    );
+  }
 }
 
 class CommentController {
@@ -269,12 +297,20 @@ class CommentController {
     String articleId, {
     required CommentTrigger when,
   }) async {
+    final article = await _ref.read(articleRepositoryProvider).get(articleId);
+    if (article == null || article.mediaType != ArticleMediaType.blog) return;
     final settings = await _ref.read(settingsRepositoryProvider).get();
     if (settings.commentTrigger != when) return;
 
+    await hydrateActivity(articleId);
+
     final running = _generationTasks[articleId];
     if (running != null) return running;
-    final task = _runGeneration(articleId, settings.commentTrigger);
+    final task = _runGeneration(
+      articleId,
+      settings.commentTrigger,
+      retry: false,
+    );
     _generationTasks[articleId] = task;
     try {
       await task;
@@ -285,13 +321,24 @@ class CommentController {
     }
   }
 
-  Future<void> _runGeneration(String articleId, CommentTrigger trigger) async {
+  Future<void> _runGeneration(
+    String articleId,
+    CommentTrigger trigger, {
+    required bool retry,
+  }) async {
     final activity = _ref.read(commentActivityProvider.notifier);
     activity.beginGeneration(articleId);
 
     final article = await _ref.read(articleRepositoryProvider).get(articleId);
     if (article == null) {
       activity.failGeneration(articleId);
+      return;
+    }
+    if (article.mediaType != ArticleMediaType.blog) {
+      activity.finishGeneration(
+        articleId,
+        const CommentGenerationResult(total: 0, generated: 0),
+      );
       return;
     }
     final pool = await _ref.read(netizenRepositoryProvider).getAll();
@@ -301,26 +348,47 @@ class CommentController {
     final models = await _ref
         .read(llmProviderRepositoryProvider)
         .getAllModels();
+    final repo = _ref.read(commentRepositoryProvider);
+
+    // Backup: if process dies mid-run, WM one-off can drain remaining items.
+    await enqueueCommentJobDrain();
 
     try {
-      final result = await _ref
-          .read(commentRepositoryProvider)
-          .ensureGenerated(
-            articleId,
-            trigger: trigger,
-            pool: pool,
-            article: article,
-            providers: providers,
-            models: models,
-            llmRepo: _ref.read(llmProviderRepositoryProvider),
-            llmClient: _ref.read(llmClientProvider),
-            forceMock: kUseMockComments,
-            onProgress: (progress) =>
-                activity.generationProgress(articleId, progress),
-          );
+      final CommentGenerationResult result;
+      if (retry && repo is CommentRepositoryImpl) {
+        result = await repo.retryGeneration(
+          articleId,
+          trigger: trigger,
+          pool: pool,
+          article: article,
+          providers: providers,
+          models: models,
+          llmRepo: _ref.read(llmProviderRepositoryProvider),
+          llmClient: _ref.read(llmClientProvider),
+          forceMock: kUseMockComments,
+          onProgress: (progress) =>
+              activity.generationProgress(articleId, progress),
+        );
+      } else {
+        result = await repo.ensureGenerated(
+          articleId,
+          trigger: trigger,
+          pool: pool,
+          article: article,
+          providers: providers,
+          models: models,
+          llmRepo: _ref.read(llmProviderRepositoryProvider),
+          llmClient: _ref.read(llmClientProvider),
+          forceMock: kUseMockComments,
+          onProgress: (progress) =>
+              activity.generationProgress(articleId, progress),
+        );
+      }
       activity.finishGeneration(articleId, result);
     } catch (_) {
       activity.failGeneration(articleId);
+      // Leave job pending for WM / next open.
+      await enqueueCommentJobDrain();
     }
   }
 
@@ -364,7 +432,11 @@ class CommentController {
     if (settings.commentTrigger == CommentTrigger.off) return;
     final running = _generationTasks[articleId];
     if (running != null) return running;
-    final task = _runGeneration(articleId, settings.commentTrigger);
+    final task = _runGeneration(
+      articleId,
+      settings.commentTrigger,
+      retry: true,
+    );
     _generationTasks[articleId] = task;
     try {
       await task;
@@ -372,6 +444,75 @@ class CommentController {
       if (identical(_generationTasks[articleId], task)) {
         _generationTasks.remove(articleId);
       }
+    }
+  }
+
+  /// Seed [CommentActivity] from durable job so UI isn't idle after kill.
+  Future<void> hydrateActivity(String articleId) async {
+    final snap = await _ref
+        .read(commentJobRepositoryProvider)
+        .getOpenJobSnapshotForArticle(articleId);
+    if (snap == null) return;
+    final activity = _ref.read(commentActivityProvider.notifier);
+    final current = _ref.read(commentActivityProvider)[articleId];
+    if (current != null && current.isBusy) return;
+
+    final names = <String, String>{};
+    final pool = await _ref.read(netizenRepositoryProvider).getAll();
+    for (final n in pool) {
+      names[n.id] = n.name;
+    }
+    final queued = <String>{};
+    final active = <String>{};
+    var completed = 0;
+    var failed = 0;
+    for (final item in snap.items) {
+      final name = names[item.netizenId] ?? item.netizenId;
+      switch (item.status) {
+        case CommentJobItemStatus.pending:
+          queued.add(name);
+        case CommentJobItemStatus.running:
+          active.add(name);
+        case CommentJobItemStatus.succeeded:
+          completed++;
+        case CommentJobItemStatus.skipped:
+        case CommentJobItemStatus.failed:
+          failed++;
+      }
+    }
+    activity.hydrateFromJob(
+      articleId: articleId,
+      total: snap.items.length,
+      completed: completed,
+      failed: failed,
+      queuedNetizens: queued,
+      activeNetizens: active,
+    );
+  }
+
+  /// After cold start: resume open jobs in UI isolate (faster than waiting for WM).
+  Future<void> recoverPendingJobs() async {
+    final jobs = _ref.read(commentJobRepositoryProvider);
+    await jobs.releaseExpiredLeases();
+    final open = await jobs.listJobsNeedingWork();
+    for (final job in open) {
+      final running = _generationTasks[job.articleId];
+      if (running != null) continue;
+      final settings = await _ref.read(settingsRepositoryProvider).get();
+      if (settings.commentTrigger == CommentTrigger.off) continue;
+      final task = _runGeneration(
+        job.articleId,
+        settings.commentTrigger,
+        retry: false,
+      );
+      _generationTasks[job.articleId] = task;
+      unawaited(
+        task.whenComplete(() {
+          if (identical(_generationTasks[job.articleId], task)) {
+            _generationTasks.remove(job.articleId);
+          }
+        }),
+      );
     }
   }
 

@@ -80,17 +80,21 @@ class DriftArticleRepository implements ArticleRepository {
 
   @override
   Stream<List<Article>> watchBookmarkedArticles() {
-    final query = _db.select(_db.articles).join([
-      innerJoin(_db.feeds, _db.feeds.id.equalsExp(_db.articles.feedId)),
-    ])
-      ..where(_db.articles.isBookmarked.equals(true))
-      ..orderBy([
-        OrderingTerm.desc(_db.articles.bookmarkedAt),
-        OrderingTerm.desc(_db.articles.publishedAt),
-      ]);
+    final query =
+        _db.select(_db.articles).join([
+            innerJoin(_db.feeds, _db.feeds.id.equalsExp(_db.articles.feedId)),
+          ])
+          ..where(_db.articles.isBookmarked.equals(true))
+          ..orderBy([
+            OrderingTerm.desc(_db.articles.bookmarkedAt),
+            OrderingTerm.desc(_db.articles.publishedAt),
+          ]);
     return query.watch().map((rows) {
       return rows.map((row) {
-        return _mapArticle(row.readTable(_db.articles), row.readTable(_db.feeds));
+        return _mapArticle(
+          row.readTable(_db.articles),
+          row.readTable(_db.feeds),
+        );
       }).toList();
     });
   }
@@ -203,6 +207,11 @@ class DriftArticleRepository implements ArticleRepository {
       imageAspect: a.imageAspect,
       featured: a.featured,
       tags: tags,
+      mediaType: articleMediaTypeFromDb(a.mediaType),
+      enclosureUrl: a.enclosureUrl,
+      enclosureMime: a.enclosureMime,
+      enclosureLength: a.enclosureLength,
+      durationSeconds: a.durationSeconds,
     );
   }
 

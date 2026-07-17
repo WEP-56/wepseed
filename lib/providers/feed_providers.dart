@@ -31,15 +31,11 @@ class FeedActions {
 
   Future<void> removeFeed(String id) => _repo.removeFeed(id);
 
-  Future<void> setPaused(String id, bool paused) =>
-      _repo.setPaused(id, paused);
+  Future<void> setPaused(String id, bool paused) => _repo.setPaused(id, paused);
 
   Future<void> refreshFeed(String id) => _repo.refreshFeed(id);
 
-  Future<void> refreshAll({
-    bool wifiOnly = false,
-    Iterable<String>? feedIds,
-  }) =>
+  Future<void> refreshAll({bool wifiOnly = false, Iterable<String>? feedIds}) =>
       _repo.refreshAll(wifiOnly: wifiOnly, feedIds: feedIds);
 
   Future<void> importOpml(String xml) => _repo.importOpml(xml);

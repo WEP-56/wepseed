@@ -37,9 +37,7 @@ class MonogramAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final plate = avatarPlate(seed ?? label);
-    final bg = filled
-        ? plate
-        : (isDark ? AppColors.inkCard : AppColors.wash);
+    final bg = filled ? plate : (isDark ? AppColors.inkCard : AppColors.wash);
     final fg = filled
         ? Colors.white
         : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight);

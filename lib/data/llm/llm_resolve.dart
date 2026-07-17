@@ -2,6 +2,32 @@ import '../models/models.dart';
 import '../repositories/llm_provider_repository.dart';
 import 'llm_client.dart';
 
+/// Resolve the enabled default provider/model for direct user-to-LLM tools.
+/// Unlike netizen resolution, this has no persona binding.
+Future<LlmRequestConfig?> resolveDefaultLlmConfig({
+  required LlmProviderRepository llmRepo,
+  required List<LlmProvider> providers,
+  required List<LlmModel> allModels,
+}) async {
+  for (final provider in providers.where((p) => p.isEnabled)) {
+    final models = allModels.where((m) => m.providerId == provider.id).toList();
+    if (models.isEmpty) continue;
+    final model = models.where((m) => m.isDefault).firstOrNull ?? models.first;
+    final key = await llmRepo.getApiKey(provider.id);
+    if (key == null || key.trim().isEmpty) continue;
+    return LlmRequestConfig(
+      providerId: provider.id,
+      protocol: provider.protocol,
+      baseUrl: provider.baseUrl,
+      modelId: model.modelId,
+      apiKey: key.trim(),
+      maxConcurrent: provider.maxConcurrent,
+      requestsPerMinute: provider.requestsPerMinute,
+    );
+  }
+  return null;
+}
+
 /// Resolve provider + model + apiKey for a netizen (or first default).
 Future<LlmRequestConfig?> resolveLlmConfigForNetizen({
   required Netizen netizen,

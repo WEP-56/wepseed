@@ -34,9 +34,9 @@ class NewPage extends ConsumerWidget {
     Future<void> onRefresh() async {
       try {
         final ids = filter.feedIds;
-        await ref.read(feedActionsProvider).refreshAll(
-          feedIds: ids.isEmpty ? null : ids,
-        );
+        await ref
+            .read(feedActionsProvider)
+            .refreshAll(feedIds: ids.isEmpty ? null : ids);
       } catch (e) {
         if (context.mounted) showAppToast('$e', context: context);
       }
@@ -130,9 +130,7 @@ class NewPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      filter.isDefault
-                          ? '下拉刷新，或检查源是否暂停'
-                          : '点右上角改筛选，或下拉刷新所选源',
+                      filter.isDefault ? '下拉刷新，或检查源是否暂停' : '点右上角改筛选，或下拉刷新所选源',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: isDark
@@ -141,10 +139,7 @@ class NewPage extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: onRefresh,
-                      child: const Text('立即刷新'),
-                    ),
+                    TextButton(onPressed: onRefresh, child: const Text('立即刷新')),
                   ],
                 ),
               ),
@@ -191,9 +186,7 @@ class _FilterButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = active
         ? (isDark ? AppColors.accentOnDark : AppColors.accent)
-        : (isDark
-            ? AppColors.textSecondaryDark
-            : AppColors.textSecondaryLight);
+        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight);
     return IconButton(
       onPressed: onTap,
       tooltip: '筛选',
@@ -244,9 +237,7 @@ Future<void> _openFilterSheet(BuildContext context, WidgetRef ref) async {
           Future<void> save(FeedFilter next) async {
             final current =
                 ref.read(settingsProvider).value ?? const AppSettings();
-            await controller.updateSettings(
-              current.copyWith(feedFilter: next),
-            );
+            await controller.updateSettings(current.copyWith(feedFilter: next));
           }
 
           return _FilterSheetScaffold(
@@ -403,8 +394,9 @@ class _FilterSheetScaffold extends StatelessWidget {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 14),
                 decoration: BoxDecoration(
-                  color: (isDark ? Colors.white : Colors.black)
-                      .withValues(alpha: 0.12),
+                  color: (isDark ? Colors.white : Colors.black).withValues(
+                    alpha: 0.12,
+                  ),
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -437,9 +429,7 @@ class _FilterTile extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       title: Text(title, style: theme.textTheme.titleSmall),
       subtitle: Text(subtitle, style: theme.textTheme.bodySmall),
-      trailing: selected
-          ? const Icon(Icons.check_rounded, size: 20)
-          : null,
+      trailing: selected ? const Icon(Icons.check_rounded, size: 20) : null,
       onTap: onTap,
     );
   }
@@ -530,10 +520,10 @@ class _EmptySourcesHint extends StatelessWidget {
               child: Text(
                 '添加订阅源，开始你的信息流',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                    ),
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
               ),
             ),
           ],
@@ -635,13 +625,16 @@ class _SourceStrip extends ConsumerWidget {
                             color: unread > 0
                                 ? (isDark ? AppColors.white : AppColors.black)
                                 : (isDark
-                                    ? AppColors.borderDark
-                                    : const Color(0xFFDBDBDB)),
+                                      ? AppColors.borderDark
+                                      : const Color(0xFFDBDBDB)),
                             width: unread > 0 ? 1.6 : 1.2,
                           ),
                         ),
-                        child:
-                            MonogramAvatar(label: s.name, size: 48, seed: s.id),
+                        child: MonogramAvatar(
+                          label: s.name,
+                          size: 48,
+                          seed: s.id,
+                        ),
                       ),
                       if (unread > 0)
                         Positioned(
@@ -658,10 +651,11 @@ class _SourceStrip extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          fontSize: 10,
-                          fontWeight:
-                              unread > 0 ? FontWeight.w600 : FontWeight.w500,
-                        ),
+                      fontSize: 10,
+                      fontWeight: unread > 0
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -752,10 +746,7 @@ class _FeaturedCard extends StatelessWidget {
                   if (imageUrl != null)
                     Opacity(
                       opacity: 0.55,
-                      child: AppNetworkImage(
-                        url: imageUrl!,
-                        fit: BoxFit.cover,
-                      ),
+                      child: AppNetworkImage(url: imageUrl!, fit: BoxFit.cover),
                     ),
                   DecoratedBox(
                     decoration: BoxDecoration(

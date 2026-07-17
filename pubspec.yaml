@@ -17,7 +17,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
 # versionName+versionCode — tag release workflow overrides both from the git tag.
-version: 0.0.4+4
+version: 0.0.5+5
 
 environment:
   sdk: ^3.11.5
@@ -59,6 +59,10 @@ dependencies:
   package_info_plus: ^10.2.1
   open_filex: ^4.7.0
   permission_handler: ^12.0.1
+  just_audio: ^0.10.6
+  just_audio_background: ^0.0.1-beta.17
+  video_player: ^2.11.1
+  audio_service: ^0.18.19
 
 dev_dependencies:
   flutter_test:

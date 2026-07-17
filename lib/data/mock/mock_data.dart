@@ -14,9 +14,7 @@ abstract final class MockData {
     FeedSource(id: 's8', name: 'V2EX', domain: 'v2ex.com'),
   ];
 
-  static UserProfile defaultUser = const UserProfile(
-    displayName: '旅人',
-  );
+  static UserProfile defaultUser = const UserProfile(displayName: '旅人');
 
   static List<Article> articles() {
     final s = sources;
@@ -37,7 +35,8 @@ abstract final class MockData {
         id: 'a2',
         source: s[2],
         title: 'AI companions are quietly becoming the new browser tabs',
-        summary: 'Not chatbots. Not search. Something closer to a reading buddy.',
+        summary:
+            'Not chatbots. Not search. Something closer to a reading buddy.',
         body: _bodyAiCompanion,
         publishedAt: now.subtract(const Duration(hours: 2)),
         imageUrl: 'https://picsum.photos/seed/wepseed2/900/700',
@@ -48,7 +47,8 @@ abstract final class MockData {
         id: 'a3',
         source: s[3],
         title: 'Show HN: A local-first RSS reader that talks back',
-        summary: 'No account. No cloud timeline. Just you, your feeds, and a quiet companion.',
+        summary:
+            'No account. No cloud timeline. Just you, your feeds, and a quiet companion.',
         body: _bodyShowHn,
         publishedAt: now.subtract(const Duration(hours: 3, minutes: 20)),
         tags: const ['开源', '本地优先'],

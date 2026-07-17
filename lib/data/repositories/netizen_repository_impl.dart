@@ -19,24 +19,26 @@ class NetizenRepositoryImpl implements NetizenRepository {
 
   @override
   Future<List<Netizen>> getAll() async {
-    final rows = await (_db.select(_db.netizens)
-          ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
-        .get();
+    final rows = await (_db.select(
+      _db.netizens,
+    )..orderBy([(t) => OrderingTerm.asc(t.sortOrder)])).get();
     return rows.map(_map).toList();
   }
 
   @override
   Future<Netizen?> getById(String id) async {
-    final row = await (_db.select(_db.netizens)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.netizens,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     return row == null ? null : _map(row);
   }
 
   @override
   Future<void> upsert(Netizen netizen) async {
     final now = DateTime.now();
-    await _db.into(_db.netizens).insertOnConflictUpdate(
+    await _db
+        .into(_db.netizens)
+        .insertOnConflictUpdate(
           NetizensCompanion(
             id: Value(netizen.id),
             name: Value(netizen.name),

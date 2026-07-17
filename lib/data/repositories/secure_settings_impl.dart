@@ -4,7 +4,7 @@ import 'settings_repository.dart';
 
 class SecureSettingsImpl implements SecureSettings {
   SecureSettingsImpl({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   static const _legacyKey = 'wepseed.llm.api_key';
 

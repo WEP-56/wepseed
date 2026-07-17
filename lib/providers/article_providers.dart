@@ -24,13 +24,17 @@ final filteredArticlesProvider = Provider<AsyncValue<List<Article>>>((ref) {
   );
 });
 
-final articlesByFeedProvider =
-    StreamProvider.family<List<Article>, String>((ref, feedId) {
+final articlesByFeedProvider = StreamProvider.family<List<Article>, String>((
+  ref,
+  feedId,
+) {
   return ref.watch(articleRepositoryProvider).watchTimeline(feedId: feedId);
 });
 
-final articleByIdProvider =
-    FutureProvider.family<Article?, String>((ref, id) async {
+final articleByIdProvider = FutureProvider.family<Article?, String>((
+  ref,
+  id,
+) async {
   // Re-resolve when timeline updates so detail page stays fresh.
   ref.watch(articlesProvider);
   return ref.watch(articleRepositoryProvider).get(id);

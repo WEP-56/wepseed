@@ -1,8 +1,8 @@
 # WEPSEED 功能实现文档
 
-> 版本：**0.0.4**（tag `v0.0.4` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
+> 版本：**0.0.5**（tag `v0.0.5` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
 > 平台：Flutter · Android 首发 · 本地优先（local-only）  
-> 状态：**0.0.4 已发 + 真机综合测通过**（评论清洗 · ME 列表 · RSS 后台通知等）  
+> 状态：**0.0.5 代码完成，待真机安装验收**；包含 D-task + 音视频播放器 + 媒体专属 LLM 对话窗  
 > 开关：`kUseMockFeed` / `kUseMockComments`（`lib/core/config/app_flags.dart`）
 
 本文档只写**要做什么、做成什么样、怎么落地**。  
@@ -30,7 +30,8 @@
 | 订阅 | 添加源、OPML 导入/导出、刷新 | **已接真**（Set + 源页） |
 | 刷 | New masonry 流 + 源主页 | **真 Stream + 下拉刷新**（时间轨已移除；**筛选已接**） |
 | 读 | 详情正文、已读、收藏 | **HTML 正文 + 图缓存 + 目录 scrubber**；外链系统浏览器 |
-| 评 | TikTok 式评论区 + 多网友 | **真 LLM**；无 Key 不灌 mock；**去 think/tool 清洗**（0.0.4 真机通过）；**D-task 未做** |
+| 播 | RSS 音频 / 视频 | **文章级媒体识别 + 沉浸详情播放器 + 全局 mini + 音频后台通知 + 视频全屏** |
+| 评 | TikTok 式评论区 + 多网友 | **真 LLM**；无 Key 不灌 mock；**去 think/tool 清洗**（0.0.4 真机通过）；**D-task 已接**（`comment_jobs` + one-off WM，待真机） |
 | 回看 | ME 时间轴 | **Drift**；三 stat → 列表 CRUD（收藏/对话/痕迹，0.0.4 真机通过） |
 | 设 | 形象、主题、字号、多提供商/网友、DATA、关于 | **大部分真持久化**；关于 = 真版本 + GitHub 更新/协议 |
 | 推 | WorkManager + 本地通知 | **已接 + 加固**：冷启动重排程、后台 isolate 插件注册、通知 channel、杀进程仍周期刷源+通知（OEM 另见 E-ROM） |
@@ -38,7 +39,7 @@
 
 ---
 
-## 1. 当前代码现状（2026-07-17 对照 · **0.0.4**）
+## 1. 当前代码现状（2026-07-17 对照 · **0.0.5 RC**）
 
 ### 1.1 目录
 
@@ -53,23 +54,24 @@ lib/
   data/
     models/models.dart
     mock/mock_data.dart
-    db/tables.dart + app_database.dart   # Drift schemaVersion = 4
+    db/tables.dart + app_database.dart   # Drift schemaVersion = 6（comment jobs + media fields）
+    comments/                     # comment_job_models · comment_generation_engine
     rss/ · llm/                   # HttpLlmClient 重试 + llm_text_sanitize
     update/github_update_service.dart
-    repositories/ …
+    repositories/ …              # + comment_job_repository*
   providers/ …
   features/
-    new/ …  me/（me_page + me_list_page）…
+    new/ …  media/（player + LLM chat）…  me/（me_page + me_list_page）…
     set/  set_page · llm_settings_section
   widgets/ glass_bottom_nav · edge_scrubber · …
 docs/
-  IMPLEMENTATION.md · TERMS.md · PRIVACY.md
+  IMPLEMENTATION.md · MEDIA_PLAYER.md · TERMS.md · PRIVACY.md
   SIGNING.private.md
 .github/workflows/
   ci.yml · release.yml
 android/
 test/
-  fixtures/ · rss_parser · toc · feed_filter · llm_client · llm_text_sanitize · semver · warm · widget · background_refresh
+  fixtures/ · rss_parser · toc · feed_filter · llm_client · llm_text_sanitize · semver · warm · widget · background_refresh · comment_job_repository
 ```
 
 ### 1.2 已可交互（真 / 半真）
@@ -82,6 +84,7 @@ test/
 | 多网友 CRUD | Drift |
 | 评论区 | 真 LLM；clearAll；重试；**sanitize 去 think/tool**（**0.0.4 真机通过**） |
 | New / 源 / 详情 | 真流 + 筛选 + HTML + scrubber + dwell |
+| 媒体 | RSS/Atom 音视频识别；音频后台/通知/倍速；视频全屏；全局 mini；媒体专属 LLM 对话窗 |
 | 通知深链 | **`push`**；返回栈 **真机通过** |
 | ME | 时间轴 + **收藏/对话/痕迹列表 CRUD**（**0.0.4 真机通过**） |
 | Set · RSS / 关于 / DATA | 订阅 OPML；更新安装；**后台被杀？** 提示 |
@@ -90,12 +93,13 @@ test/
 
 ### 1.3 明确未做 / 下一会话主路径
 
-**0.0.4 真机综合测已通过**（评论清洗 · ME 列表 · RSS 后台通知等）。
+**0.0.5 代码与自动化测试已通过**；D-task 与媒体功能待本轮真机安装验收。
 
 | 优先级 | 项 |
 |--------|-----|
-| 中 | **D-task**：评论生成任务持久化 + WorkManager 恢复（杀进程可靠）— 与 RSS 独立 |
-| 中 | E-ROM 长期：极端省电/多 ROM 文档与验收可继续补（用户本轮综合测无问题） |
+| 中 | **0.0.5 真机验收**：D-task 杀进程恢复；音频后台/通知；视频全屏；媒体 AI 对话 |
+| 低 | 媒体 M3：进度持久化、下载缓存、视频 PiP |
+| 中 | E-ROM 长期：极端省电/多 ROM 文档与验收可继续补 |
 | 低 | 评论流式气泡；应用内 WebView（§15.6） |
 | 基建 | CI Actions Node 20 弃用告警可择机升 action 大版本 |
 
@@ -118,11 +122,13 @@ test/
 | 更新 | `GithubUpdateService` + Set `_UpdateSheet` | `wepseed-*-{abi}.apk` |
 | 链接常量 | `lib/core/config/app_links.dart` | TERMS/PRIVACY/API |
 | 签名 | `docs/SIGNING.private.md`（本地 only） | 勿提交 jks / key.properties |
-| 评论清空 | `CommentRepository.clearAll` | 清脏评论 / 旧 mock 后重生成 |
+| 评论清空 | `CommentRepository.clearAll` | 同步 cancel `comment_jobs`；清脏评论 / 旧 mock 后重生成 |
+| 评论任务 | `comment_jobs` + `comment_job_items` · `CommentGenerationEngine` · `runCommentJobsDrain` | taskName **`wepseed.drain-comment-jobs`**（≠ RSS）；租约防 UI/WM 双跑；冷启动 `recoverCommentJobsOnColdStart` + UI `recoverPendingJobs` |
+| 媒体 | `mediaSessionProvider` + `DetailMediaPlayer` + `MiniMediaPlayer` | 全局单会话；媒体 AI 对话不写 comments/jobs |
 
-### 1.5 已知问题 / 技术债（登记 · **0.0.4 真机后**）
+### 1.5 已知问题 / 技术债（登记 · **D-task 代码后**）
 
-> 下会话：可选 **D-task** 或 F 余；E-ROM 长期可选补。
+> 下会话：根据 0.0.5 真机反馈修复；M3 / E-ROM / F 余可选。
 
 | # | 现象 | 状态 |
 |---|------|------|
@@ -132,7 +138,8 @@ test/
 | F-back / F-notif-back / F-filter / F-toast / F-about / F-llm | UX 债 | **关闭**（0.0.2–0.0.3 真机） |
 | F-comment-think | 评论展示思考过程 / toolcall | **关闭**（`sanitizeLlmCommentText`；**0.0.4 真机通过**） |
 | F-me-lists | ME 收藏/对话/痕迹不可点 | **关闭**（列表 CRUD；**0.0.4 真机通过**） |
-| **D-task** | 评论生成杀进程丢任务 | **未做**（内存 Future；与 RSS WM 无关） |
+| **D-task** | 评论生成杀进程丢任务 | **代码已接**（schema 5 + one-off WM）；**待真机验收** |
+| **P1-media** | 音视频播放器与媒体 AI 对话 | **代码已接**（schema 6）；**待真机验收** |
 | E-ROM | 厂商杀后台 | Set 有提示；**0.0.4 综合测无问题**；极端 ROM 长期可续 |
 
 **RSS 后台（杀进程仍通知）— 已加固 + 0.0.4 测过：**
@@ -147,7 +154,18 @@ test/
 | 任务名 | `wepseed.periodic-rss-refresh` / `wepseed.refresh-feeds` |
 | OEM 边界 | 强制停止 / 超激进省电仍可能停 WM，需用户放行自启动 |
 
-**D-task 代码核查（评论，未做）：** 无 `comment_jobs`；`CommentController` 内存 Future；WM dispatcher 仅 RSS task。  
+**D-task（评论杀进程恢复）— 已实现：**
+
+| 点 | 做法 |
+|----|------|
+| 表 | `comment_jobs` + `comment_job_items`（schemaVersion **5**） |
+| 采样 | 创建 job 时写死 `pickedNetizenIdsJson`，恢复**不重掷** |
+| 部分完成 | 已有某网友顶层评则 item 记 succeeded，只跑剩余 |
+| 租约 | `leaseOwner` + `leaseUntil`；过期冷启动 `releaseExpiredLeases` |
+| 生成核 | `CommentGenerationEngine`（UI + WM 共用） |
+| WM | one-off `wepseed.oneoff-comment-jobs` / task `wepseed.drain-comment-jobs` |
+| 冷启动 | `recoverCommentJobsOnColdStart` + App `recoverPendingJobs` |
+| 边界 | 用户回复网友仍进程内 Future（非 D-task 范围） |  
 
 ---
 
@@ -180,7 +198,7 @@ Set 内 sheet 仍用 `showModalBottomSheet`（提供商/网友编辑）。深链
 
 ## 3. 领域模型（对照 Drift + models.dart）
 
-### 3.1 表 / 实体（schemaVersion = 4）
+### 3.1 表 / 实体（schemaVersion = 6）
 
 ```text
 # RSS（Phase B 主写）
@@ -205,6 +223,13 @@ netizens        id, name, styleLabel?, systemHint, avatarPath?,
                 weight, providerId?, modelId?, isEnabled, …
 comments        id, articleId, authorType(user|netizen),
                 netizenId?, parentId?, content, createdAt
+
+# D-task 评论生成任务
+comment_jobs    id, articleId, status, trigger, pickedNetizenIdsJson,
+                attempt, maxAttempts, lastError?, leaseOwner?, leaseUntil?,
+                createdAt, updatedAt
+comment_job_items id, jobId → comment_jobs, netizenId, status,
+                attempt, lastError?, commentId?, sortOrder, createdAt, updatedAt
 
 user_profiles    id=default, displayName, …
 app_settings    themeMode, fontScale, refreshMinutes, wifiOnly,
@@ -660,18 +685,22 @@ user reply(parentId, text)
 Set「清除全部评论」→ clearAll() → 下次可重生成
 ```
 
-### 7.4 评论任务生命周期（1.5.0）
+### 7.4 评论任务生命周期（D-task）
 
 ```text
-preparing → queued → running → completed / failed
+Job:  pending → running → completed | failed | cancelled
+Item: pending → running → succeeded | skipped | failed
                   ↘ provider lane（maxConcurrent + RPM）
 ```
 
-- `CommentController`：文章级任务去重；页面关闭后任务在应用进程内继续。
-- `ScheduledLlmClient`：提供商级 FIFO 队列；所有文章、顶层评论和回复共享额度，默认并发 1。
-- `CommentActivityNotifier`：广播排队、执行、回复和完成事件；评论 sheet 与全局提示消费同一状态。
-- `CommentRepository`：成功一条写一条；网络错误不写入评论表；用户回复先本地落库，再等待网友回复。
-- **当前边界**：进程存活时可跨页面继续；Android 杀进程后不能恢复。完整后台可靠性需新增持久化 `comment_jobs/comment_job_items`、租约/重试次数/下次执行时间，并由 WorkManager 恢复；不能把普通 Future 视为可靠后台任务。
+- `CommentController`：同进程 `_generationTasks` 去重；写/续 `comment_jobs`；页面关闭后进程内仍可续；杀进程靠 DB + WM/冷启动。
+- `CommentJobRepository`：创建 job（采样一次）、claim 租约、item 状态、finalize、releaseExpiredLeases。
+- `CommentGenerationEngine`：UI isolate 与 WM isolate 共用；已存在该网友顶层评则 skip LLM。
+- `ScheduledLlmClient`：提供商级 FIFO；默认并发 1。
+- `CommentActivityNotifier`：直播进度 + `hydrateFromJob` 冷启动水合。
+- `CommentRepository`：成功一条写一条；clear 时 cancel jobs；无 Key → item skipped。
+- WM：`runCommentJobsDrain` / taskName `wepseed.drain-comment-jobs`（与 RSS 分离）。
+- **边界**：用户回复→网友回帖仍进程内 Future（未入 job 表）。
 
 ---
 
@@ -737,8 +766,8 @@ preparing → queued → running → completed / failed
 - [x] HTTP 有限重试（超时 / 网络 / 429 / 5xx；401 不重试）  
 - [x] 提供商编辑 **测试连接**（独立 HttpLlmClient，不占评论队列）  
 - [x] **评论清洗** `sanitizeLlmCommentText`（think/tool/纯计划独白；**0.0.4 真机通过**）  
+- [x] **D-task**：`comment_jobs` / items + Engine + one-off WM + 冷启动恢复 — **代码已接，待真机**  
 - [ ]（可选）流式输出到评论气泡  
-- [ ] **D-task**：持久化评论任务 + WorkManager 恢复 — **未实现**  
 
 ### Phase E — ME 温度与通知 ✅ 主路径
 
@@ -866,8 +895,9 @@ UI 只依赖接口；**Phase B 新增 `DriftFeedRepository` / `DriftArticleRepos
 - [x] 返回 / Toast / 关于更新安装 / LLM 重试·测连 / Release  
 - [x] 通知深链返回栈 + New 筛选（0.0.3；**真机通过**）  
 - [x] 评论 think/tool 清洗（0.0.4；**真机通过**）  
-- [ ] **D-task** 评论任务杀进程恢复（**未做**）  
+- [x] **D-task** 评论任务持久化 + WM 恢复（**代码已接**；真机验收后 0.0.5）  
 - [ ] 应用内 WebView（F 余）  
+- [x] P1 媒体类型 + 音视频播放器 + 全局 mini + 媒体专属 LLM 对话窗（待真机）
 
 ---
 
@@ -901,28 +931,31 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.1 一句话
 
-**`v0.0.4` 已发且真机综合测通过。下一可选：D-task（评论杀进程恢复）或 F 余（流式/WebView）。**
+**`v0.0.5` 已完成并进入真机验收：D-task 杀进程恢复 + schema 6 媒体字段 + 音视频播放器 + 全局 mini + 媒体专属 LLM 对话窗。**
 
 ### 15.2 现状速查
 
 | 模块 | 路径 / 要点 |
 |------|-------------|
-| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.4`** · `d7b407c` |
+| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.5`** |
 | Flag | `kUseMockFeed=false`；`kUseMockComments=false` |
-| 版本 | `pubspec` `0.0.4+4` |
-| Drift | **schemaVersion = 4**；**无** comment_jobs |
+| 版本 | `pubspec` `0.0.5+5` |
+| Drift | **schemaVersion = 6**；评论任务表 + articles 媒体字段 |
 | 评论清洗 | `lib/data/llm/llm_text_sanitize.dart` · complete 后 + 入库前 |
+| 评论任务 | `lib/data/comments/comment_generation_engine.dart` · `comment_job_repository*` · `comment_job_worker.dart` |
 | ME 列表 | `/me/bookmarks` · `/me/chats` · `/me/traces` · `me_list_page.dart` |
 | RSS 后台 | `scheduleFromDatabase` · `runRssRefreshJob` · `DartPluginRegistrant` |
+| 评论 WM | one-off `wepseed.drain-comment-jobs`（≠ RSS） |
+| 媒体 | `features/media/` · `mediaSessionProvider` · just_audio/audio_service · video_player |
+| 媒体 AI | 仅音视频详情「一起聊」；默认模型；内存会话；不写网友评论任务 |
 | 通知 | channel `rss_updates`；深链 **`push` only** |
-| 评论生成 | 仍内存 Future（**D-task 未做**） |
 | 债表 | **§1.5** |
 
 ### 15.3 下一会话建议顺序
 
-1. **可选 D-task**：`comment_jobs` 表 + WM 恢复（与 RSS taskName 分离）  
-2. F 余：流式气泡 / WebView（§15.6）  
-3. 再发版：`git tag vX.Y.Z && git push origin vX.Y.Z`
+1. **0.0.5 真机**：D-task 生成中强制停止；音频后台/通知/倍速；视频全屏；mini；媒体 AI 对话  
+2. 根据真机反馈修复播放器格式兼容、系统栏与 OEM 后台行为  
+3. 后续：媒体 M3（进度持久化/PiP/下载）或 WebView（§15.6）
 
 ### 15.4 不要做的事
 
@@ -944,8 +977,8 @@ flutter pub get
 flutter analyze
 flutter test
 flutter run -d <device>
-# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.4
-# 首选 wepseed-0.0.4-arm64-v8a.apk
+# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.5
+# 首选 wepseed-0.0.5-arm64-v8a.apk
 ```
 
 ### 15.6 Backlog：应用内 WebView 阅读器（Phase F 余）
@@ -959,6 +992,17 @@ flutter run -d <device>
 | 风险 | 桌面 UA；隐私文案已部分在 `PRIVACY.md` |
 
 未实现前：**`LaunchMode.externalApplication` only**。
+
+### 15.6.1 已实现：音视频媒体类型与播放器（P1）
+
+**专规文档：[`docs/MEDIA_PLAYER.md`](MEDIA_PLAYER.md)**（类型推断 · schema · mini player · M0–M2 已完成）。
+
+| 项 | 说明 |
+|----|------|
+| 范围 | 文章级 `blog`/`audio`/`video`；全局 mini；音频后台通知 |
+| 非目标首版 | 完整播客壳、下载缓存、源级分栏、无直链站点假播放 |
+| 与 LLM | mediaType ≠ blog → 不创建网友评论任务；改用独立「一起聊」悬浮窗 |
+| 余项 | M3：进度持久化、视频 PiP、下载缓存、源级筛选 |
 
 ### 15.7 已知产品决策（勿回退）
 
@@ -987,7 +1031,8 @@ flutter run -d <device>
 | **0.0.2** | 双击退出；Toast；关于更新；LLM 重试·测连；Maven 官方优先 |
 | **0.0.3** | 通知 `push`；New 筛选 schema 4；**真机通过** |
 | **0.0.4** | 评论 sanitize；ME 列表 CRUD；RSS WM 加固；**真机综合测通过** |
-| **未收口** | **D-task**；流式/WebView；E-ROM 极端场景可选补 |
+| **0.0.5** | D-task；schema 6 媒体识别；音频/视频/全局 mini；音频系统媒体会话；媒体 AI 对话窗；待真机反馈 |
+| **未收口** | 0.0.5 真机；媒体 M3；流式/WebView；E-ROM 可选 |
 
 ### 15.9 会话记录
 
@@ -997,7 +1042,19 @@ flutter run -d <device>
 - 评论：`sanitizeLlmCommentText` + prompt；去思考/tool  
 - ME：收藏/对话/痕迹列表 CRUD  
 - RSS：冷启动重排程、isolate 插件、channel、无 battery-not-low  
-- tag `v0.0.4` · `d7b407c` · **用户真机综合测无问题**（本会话文档收口）
+- tag `v0.0.4` · `d7b407c` · **用户真机综合测无问题**
+
+**D-task（本会话 · 未抬版本号）：**  
+- Drift v5：`comment_jobs` / `comment_job_items`  
+- `CommentGenerationEngine` + job repo；部分完成可补全  
+- WM one-off `wepseed.drain-comment-jobs`；冷启动 recover  
+- 单测：job/lease/partial/legacy short-circuit  
+
+**0.0.5 媒体实现：**  
+- RSS/Atom enclosure 与 media:content 推断；Drift schema 6  
+- just_audio + audio_service 后台通知；video_player + 全屏；全局 mini  
+- 音视频隐藏网友评论，提供临时 LLM「一起聊」悬浮窗  
+- 自动化：媒体解析、类型 roundtrip、评论任务隔离；真机待验收
 
 ---
 

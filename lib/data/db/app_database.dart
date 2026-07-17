@@ -19,13 +19,15 @@ part 'app_database.g.dart';
     LlmModels,
     Netizens,
     Comments,
+    CommentJobs,
+    CommentJobItems,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -50,6 +52,17 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) {
         await m.addColumn(appSettingsRows, appSettingsRows.feedFilterJson);
+      }
+      if (from < 5) {
+        await m.createTable(commentJobs);
+        await m.createTable(commentJobItems);
+      }
+      if (from < 6) {
+        await m.addColumn(articles, articles.mediaType);
+        await m.addColumn(articles, articles.enclosureUrl);
+        await m.addColumn(articles, articles.enclosureMime);
+        await m.addColumn(articles, articles.enclosureLength);
+        await m.addColumn(articles, articles.durationSeconds);
       }
     },
   );

@@ -35,9 +35,7 @@ class RssClient {
 
     late http.Response response;
     try {
-      response = await _client
-          .get(uri, headers: headers)
-          .timeout(_timeout);
+      response = await _client.get(uri, headers: headers).timeout(_timeout);
     } on Exception catch (e) {
       throw RssException(_networkMessage(e));
     }

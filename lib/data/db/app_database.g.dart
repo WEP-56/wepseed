@@ -734,6 +734,62 @@ class $ArticlesTable extends Articles
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _mediaTypeMeta = const VerificationMeta(
+    'mediaType',
+  );
+  @override
+  late final GeneratedColumn<String> mediaType = GeneratedColumn<String>(
+    'media_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('blog'),
+  );
+  static const VerificationMeta _enclosureUrlMeta = const VerificationMeta(
+    'enclosureUrl',
+  );
+  @override
+  late final GeneratedColumn<String> enclosureUrl = GeneratedColumn<String>(
+    'enclosure_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _enclosureMimeMeta = const VerificationMeta(
+    'enclosureMime',
+  );
+  @override
+  late final GeneratedColumn<String> enclosureMime = GeneratedColumn<String>(
+    'enclosure_mime',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _enclosureLengthMeta = const VerificationMeta(
+    'enclosureLength',
+  );
+  @override
+  late final GeneratedColumn<int> enclosureLength = GeneratedColumn<int>(
+    'enclosure_length',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _durationSecondsMeta = const VerificationMeta(
+    'durationSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> durationSeconds = GeneratedColumn<int>(
+    'duration_seconds',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _imageAspectMeta = const VerificationMeta(
     'imageAspect',
   );
@@ -855,6 +911,11 @@ class $ArticlesTable extends Articles
     contentHtml,
     contentText,
     imageUrl,
+    mediaType,
+    enclosureUrl,
+    enclosureMime,
+    enclosureLength,
+    durationSeconds,
     imageAspect,
     featured,
     tagsJson,
@@ -946,6 +1007,48 @@ class $ArticlesTable extends Articles
       context.handle(
         _imageUrlMeta,
         imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta),
+      );
+    }
+    if (data.containsKey('media_type')) {
+      context.handle(
+        _mediaTypeMeta,
+        mediaType.isAcceptableOrUnknown(data['media_type']!, _mediaTypeMeta),
+      );
+    }
+    if (data.containsKey('enclosure_url')) {
+      context.handle(
+        _enclosureUrlMeta,
+        enclosureUrl.isAcceptableOrUnknown(
+          data['enclosure_url']!,
+          _enclosureUrlMeta,
+        ),
+      );
+    }
+    if (data.containsKey('enclosure_mime')) {
+      context.handle(
+        _enclosureMimeMeta,
+        enclosureMime.isAcceptableOrUnknown(
+          data['enclosure_mime']!,
+          _enclosureMimeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('enclosure_length')) {
+      context.handle(
+        _enclosureLengthMeta,
+        enclosureLength.isAcceptableOrUnknown(
+          data['enclosure_length']!,
+          _enclosureLengthMeta,
+        ),
+      );
+    }
+    if (data.containsKey('duration_seconds')) {
+      context.handle(
+        _durationSecondsMeta,
+        durationSeconds.isAcceptableOrUnknown(
+          data['duration_seconds']!,
+          _durationSecondsMeta,
+        ),
       );
     }
     if (data.containsKey('image_aspect')) {
@@ -1071,6 +1174,26 @@ class $ArticlesTable extends Articles
         DriftSqlType.string,
         data['${effectivePrefix}image_url'],
       ),
+      mediaType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}media_type'],
+      )!,
+      enclosureUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}enclosure_url'],
+      ),
+      enclosureMime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}enclosure_mime'],
+      ),
+      enclosureLength: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}enclosure_length'],
+      ),
+      durationSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_seconds'],
+      ),
       imageAspect: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}image_aspect'],
@@ -1127,6 +1250,11 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
   final String? contentHtml;
   final String contentText;
   final String? imageUrl;
+  final String mediaType;
+  final String? enclosureUrl;
+  final String? enclosureMime;
+  final int? enclosureLength;
+  final int? durationSeconds;
   final double imageAspect;
   final bool featured;
   final String tagsJson;
@@ -1147,6 +1275,11 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
     this.contentHtml,
     required this.contentText,
     this.imageUrl,
+    required this.mediaType,
+    this.enclosureUrl,
+    this.enclosureMime,
+    this.enclosureLength,
+    this.durationSeconds,
     required this.imageAspect,
     required this.featured,
     required this.tagsJson,
@@ -1177,6 +1310,19 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
     map['content_text'] = Variable<String>(contentText);
     if (!nullToAbsent || imageUrl != null) {
       map['image_url'] = Variable<String>(imageUrl);
+    }
+    map['media_type'] = Variable<String>(mediaType);
+    if (!nullToAbsent || enclosureUrl != null) {
+      map['enclosure_url'] = Variable<String>(enclosureUrl);
+    }
+    if (!nullToAbsent || enclosureMime != null) {
+      map['enclosure_mime'] = Variable<String>(enclosureMime);
+    }
+    if (!nullToAbsent || enclosureLength != null) {
+      map['enclosure_length'] = Variable<int>(enclosureLength);
+    }
+    if (!nullToAbsent || durationSeconds != null) {
+      map['duration_seconds'] = Variable<int>(durationSeconds);
     }
     map['image_aspect'] = Variable<double>(imageAspect);
     map['featured'] = Variable<bool>(featured);
@@ -1212,6 +1358,19 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       imageUrl: imageUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(imageUrl),
+      mediaType: Value(mediaType),
+      enclosureUrl: enclosureUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(enclosureUrl),
+      enclosureMime: enclosureMime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(enclosureMime),
+      enclosureLength: enclosureLength == null && nullToAbsent
+          ? const Value.absent()
+          : Value(enclosureLength),
+      durationSeconds: durationSeconds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(durationSeconds),
       imageAspect: Value(imageAspect),
       featured: Value(featured),
       tagsJson: Value(tagsJson),
@@ -1244,6 +1403,11 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       contentHtml: serializer.fromJson<String?>(json['contentHtml']),
       contentText: serializer.fromJson<String>(json['contentText']),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
+      mediaType: serializer.fromJson<String>(json['mediaType']),
+      enclosureUrl: serializer.fromJson<String?>(json['enclosureUrl']),
+      enclosureMime: serializer.fromJson<String?>(json['enclosureMime']),
+      enclosureLength: serializer.fromJson<int?>(json['enclosureLength']),
+      durationSeconds: serializer.fromJson<int?>(json['durationSeconds']),
       imageAspect: serializer.fromJson<double>(json['imageAspect']),
       featured: serializer.fromJson<bool>(json['featured']),
       tagsJson: serializer.fromJson<String>(json['tagsJson']),
@@ -1269,6 +1433,11 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
       'contentHtml': serializer.toJson<String?>(contentHtml),
       'contentText': serializer.toJson<String>(contentText),
       'imageUrl': serializer.toJson<String?>(imageUrl),
+      'mediaType': serializer.toJson<String>(mediaType),
+      'enclosureUrl': serializer.toJson<String?>(enclosureUrl),
+      'enclosureMime': serializer.toJson<String?>(enclosureMime),
+      'enclosureLength': serializer.toJson<int?>(enclosureLength),
+      'durationSeconds': serializer.toJson<int?>(durationSeconds),
       'imageAspect': serializer.toJson<double>(imageAspect),
       'featured': serializer.toJson<bool>(featured),
       'tagsJson': serializer.toJson<String>(tagsJson),
@@ -1292,6 +1461,11 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
     Value<String?> contentHtml = const Value.absent(),
     String? contentText,
     Value<String?> imageUrl = const Value.absent(),
+    String? mediaType,
+    Value<String?> enclosureUrl = const Value.absent(),
+    Value<String?> enclosureMime = const Value.absent(),
+    Value<int?> enclosureLength = const Value.absent(),
+    Value<int?> durationSeconds = const Value.absent(),
     double? imageAspect,
     bool? featured,
     String? tagsJson,
@@ -1312,6 +1486,17 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
     contentHtml: contentHtml.present ? contentHtml.value : this.contentHtml,
     contentText: contentText ?? this.contentText,
     imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
+    mediaType: mediaType ?? this.mediaType,
+    enclosureUrl: enclosureUrl.present ? enclosureUrl.value : this.enclosureUrl,
+    enclosureMime: enclosureMime.present
+        ? enclosureMime.value
+        : this.enclosureMime,
+    enclosureLength: enclosureLength.present
+        ? enclosureLength.value
+        : this.enclosureLength,
+    durationSeconds: durationSeconds.present
+        ? durationSeconds.value
+        : this.durationSeconds,
     imageAspect: imageAspect ?? this.imageAspect,
     featured: featured ?? this.featured,
     tagsJson: tagsJson ?? this.tagsJson,
@@ -1338,6 +1523,19 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           ? data.contentText.value
           : this.contentText,
       imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
+      mediaType: data.mediaType.present ? data.mediaType.value : this.mediaType,
+      enclosureUrl: data.enclosureUrl.present
+          ? data.enclosureUrl.value
+          : this.enclosureUrl,
+      enclosureMime: data.enclosureMime.present
+          ? data.enclosureMime.value
+          : this.enclosureMime,
+      enclosureLength: data.enclosureLength.present
+          ? data.enclosureLength.value
+          : this.enclosureLength,
+      durationSeconds: data.durationSeconds.present
+          ? data.durationSeconds.value
+          : this.durationSeconds,
       imageAspect: data.imageAspect.present
           ? data.imageAspect.value
           : this.imageAspect,
@@ -1371,6 +1569,11 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           ..write('contentHtml: $contentHtml, ')
           ..write('contentText: $contentText, ')
           ..write('imageUrl: $imageUrl, ')
+          ..write('mediaType: $mediaType, ')
+          ..write('enclosureUrl: $enclosureUrl, ')
+          ..write('enclosureMime: $enclosureMime, ')
+          ..write('enclosureLength: $enclosureLength, ')
+          ..write('durationSeconds: $durationSeconds, ')
           ..write('imageAspect: $imageAspect, ')
           ..write('featured: $featured, ')
           ..write('tagsJson: $tagsJson, ')
@@ -1385,7 +1588,7 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     feedId,
     guid,
@@ -1396,6 +1599,11 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
     contentHtml,
     contentText,
     imageUrl,
+    mediaType,
+    enclosureUrl,
+    enclosureMime,
+    enclosureLength,
+    durationSeconds,
     imageAspect,
     featured,
     tagsJson,
@@ -1405,7 +1613,7 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
     isBookmarked,
     readAt,
     bookmarkedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1420,6 +1628,11 @@ class ArticleRow extends DataClass implements Insertable<ArticleRow> {
           other.contentHtml == this.contentHtml &&
           other.contentText == this.contentText &&
           other.imageUrl == this.imageUrl &&
+          other.mediaType == this.mediaType &&
+          other.enclosureUrl == this.enclosureUrl &&
+          other.enclosureMime == this.enclosureMime &&
+          other.enclosureLength == this.enclosureLength &&
+          other.durationSeconds == this.durationSeconds &&
           other.imageAspect == this.imageAspect &&
           other.featured == this.featured &&
           other.tagsJson == this.tagsJson &&
@@ -1442,6 +1655,11 @@ class ArticlesCompanion extends UpdateCompanion<ArticleRow> {
   final Value<String?> contentHtml;
   final Value<String> contentText;
   final Value<String?> imageUrl;
+  final Value<String> mediaType;
+  final Value<String?> enclosureUrl;
+  final Value<String?> enclosureMime;
+  final Value<int?> enclosureLength;
+  final Value<int?> durationSeconds;
   final Value<double> imageAspect;
   final Value<bool> featured;
   final Value<String> tagsJson;
@@ -1463,6 +1681,11 @@ class ArticlesCompanion extends UpdateCompanion<ArticleRow> {
     this.contentHtml = const Value.absent(),
     this.contentText = const Value.absent(),
     this.imageUrl = const Value.absent(),
+    this.mediaType = const Value.absent(),
+    this.enclosureUrl = const Value.absent(),
+    this.enclosureMime = const Value.absent(),
+    this.enclosureLength = const Value.absent(),
+    this.durationSeconds = const Value.absent(),
     this.imageAspect = const Value.absent(),
     this.featured = const Value.absent(),
     this.tagsJson = const Value.absent(),
@@ -1485,6 +1708,11 @@ class ArticlesCompanion extends UpdateCompanion<ArticleRow> {
     this.contentHtml = const Value.absent(),
     this.contentText = const Value.absent(),
     this.imageUrl = const Value.absent(),
+    this.mediaType = const Value.absent(),
+    this.enclosureUrl = const Value.absent(),
+    this.enclosureMime = const Value.absent(),
+    this.enclosureLength = const Value.absent(),
+    this.durationSeconds = const Value.absent(),
     this.imageAspect = const Value.absent(),
     this.featured = const Value.absent(),
     this.tagsJson = const Value.absent(),
@@ -1512,6 +1740,11 @@ class ArticlesCompanion extends UpdateCompanion<ArticleRow> {
     Expression<String>? contentHtml,
     Expression<String>? contentText,
     Expression<String>? imageUrl,
+    Expression<String>? mediaType,
+    Expression<String>? enclosureUrl,
+    Expression<String>? enclosureMime,
+    Expression<int>? enclosureLength,
+    Expression<int>? durationSeconds,
     Expression<double>? imageAspect,
     Expression<bool>? featured,
     Expression<String>? tagsJson,
@@ -1534,6 +1767,11 @@ class ArticlesCompanion extends UpdateCompanion<ArticleRow> {
       if (contentHtml != null) 'content_html': contentHtml,
       if (contentText != null) 'content_text': contentText,
       if (imageUrl != null) 'image_url': imageUrl,
+      if (mediaType != null) 'media_type': mediaType,
+      if (enclosureUrl != null) 'enclosure_url': enclosureUrl,
+      if (enclosureMime != null) 'enclosure_mime': enclosureMime,
+      if (enclosureLength != null) 'enclosure_length': enclosureLength,
+      if (durationSeconds != null) 'duration_seconds': durationSeconds,
       if (imageAspect != null) 'image_aspect': imageAspect,
       if (featured != null) 'featured': featured,
       if (tagsJson != null) 'tags_json': tagsJson,
@@ -1558,6 +1796,11 @@ class ArticlesCompanion extends UpdateCompanion<ArticleRow> {
     Value<String?>? contentHtml,
     Value<String>? contentText,
     Value<String?>? imageUrl,
+    Value<String>? mediaType,
+    Value<String?>? enclosureUrl,
+    Value<String?>? enclosureMime,
+    Value<int?>? enclosureLength,
+    Value<int?>? durationSeconds,
     Value<double>? imageAspect,
     Value<bool>? featured,
     Value<String>? tagsJson,
@@ -1580,6 +1823,11 @@ class ArticlesCompanion extends UpdateCompanion<ArticleRow> {
       contentHtml: contentHtml ?? this.contentHtml,
       contentText: contentText ?? this.contentText,
       imageUrl: imageUrl ?? this.imageUrl,
+      mediaType: mediaType ?? this.mediaType,
+      enclosureUrl: enclosureUrl ?? this.enclosureUrl,
+      enclosureMime: enclosureMime ?? this.enclosureMime,
+      enclosureLength: enclosureLength ?? this.enclosureLength,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
       imageAspect: imageAspect ?? this.imageAspect,
       featured: featured ?? this.featured,
       tagsJson: tagsJson ?? this.tagsJson,
@@ -1625,6 +1873,21 @@ class ArticlesCompanion extends UpdateCompanion<ArticleRow> {
     }
     if (imageUrl.present) {
       map['image_url'] = Variable<String>(imageUrl.value);
+    }
+    if (mediaType.present) {
+      map['media_type'] = Variable<String>(mediaType.value);
+    }
+    if (enclosureUrl.present) {
+      map['enclosure_url'] = Variable<String>(enclosureUrl.value);
+    }
+    if (enclosureMime.present) {
+      map['enclosure_mime'] = Variable<String>(enclosureMime.value);
+    }
+    if (enclosureLength.present) {
+      map['enclosure_length'] = Variable<int>(enclosureLength.value);
+    }
+    if (durationSeconds.present) {
+      map['duration_seconds'] = Variable<int>(durationSeconds.value);
     }
     if (imageAspect.present) {
       map['image_aspect'] = Variable<double>(imageAspect.value);
@@ -1672,6 +1935,11 @@ class ArticlesCompanion extends UpdateCompanion<ArticleRow> {
           ..write('contentHtml: $contentHtml, ')
           ..write('contentText: $contentText, ')
           ..write('imageUrl: $imageUrl, ')
+          ..write('mediaType: $mediaType, ')
+          ..write('enclosureUrl: $enclosureUrl, ')
+          ..write('enclosureMime: $enclosureMime, ')
+          ..write('enclosureLength: $enclosureLength, ')
+          ..write('durationSeconds: $durationSeconds, ')
           ..write('imageAspect: $imageAspect, ')
           ..write('featured: $featured, ')
           ..write('tagsJson: $tagsJson, ')
@@ -6460,6 +6728,1338 @@ class CommentsCompanion extends UpdateCompanion<CommentRow> {
   }
 }
 
+class $CommentJobsTable extends CommentJobs
+    with TableInfo<$CommentJobsTable, CommentJobRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CommentJobsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _articleIdMeta = const VerificationMeta(
+    'articleId',
+  );
+  @override
+  late final GeneratedColumn<String> articleId = GeneratedColumn<String>(
+    'article_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _triggerMeta = const VerificationMeta(
+    'trigger',
+  );
+  @override
+  late final GeneratedColumn<String> trigger = GeneratedColumn<String>(
+    'trigger',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pickedNetizenIdsJsonMeta =
+      const VerificationMeta('pickedNetizenIdsJson');
+  @override
+  late final GeneratedColumn<String> pickedNetizenIdsJson =
+      GeneratedColumn<String>(
+        'picked_netizen_ids_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      );
+  static const VerificationMeta _attemptMeta = const VerificationMeta(
+    'attempt',
+  );
+  @override
+  late final GeneratedColumn<int> attempt = GeneratedColumn<int>(
+    'attempt',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _maxAttemptsMeta = const VerificationMeta(
+    'maxAttempts',
+  );
+  @override
+  late final GeneratedColumn<int> maxAttempts = GeneratedColumn<int>(
+    'max_attempts',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(3),
+  );
+  static const VerificationMeta _lastErrorMeta = const VerificationMeta(
+    'lastError',
+  );
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+    'last_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _leaseOwnerMeta = const VerificationMeta(
+    'leaseOwner',
+  );
+  @override
+  late final GeneratedColumn<String> leaseOwner = GeneratedColumn<String>(
+    'lease_owner',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _leaseUntilMeta = const VerificationMeta(
+    'leaseUntil',
+  );
+  @override
+  late final GeneratedColumn<DateTime> leaseUntil = GeneratedColumn<DateTime>(
+    'lease_until',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    articleId,
+    status,
+    trigger,
+    pickedNetizenIdsJson,
+    attempt,
+    maxAttempts,
+    lastError,
+    leaseOwner,
+    leaseUntil,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'comment_jobs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CommentJobRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('article_id')) {
+      context.handle(
+        _articleIdMeta,
+        articleId.isAcceptableOrUnknown(data['article_id']!, _articleIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_articleIdMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('trigger')) {
+      context.handle(
+        _triggerMeta,
+        trigger.isAcceptableOrUnknown(data['trigger']!, _triggerMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_triggerMeta);
+    }
+    if (data.containsKey('picked_netizen_ids_json')) {
+      context.handle(
+        _pickedNetizenIdsJsonMeta,
+        pickedNetizenIdsJson.isAcceptableOrUnknown(
+          data['picked_netizen_ids_json']!,
+          _pickedNetizenIdsJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('attempt')) {
+      context.handle(
+        _attemptMeta,
+        attempt.isAcceptableOrUnknown(data['attempt']!, _attemptMeta),
+      );
+    }
+    if (data.containsKey('max_attempts')) {
+      context.handle(
+        _maxAttemptsMeta,
+        maxAttempts.isAcceptableOrUnknown(
+          data['max_attempts']!,
+          _maxAttemptsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_error')) {
+      context.handle(
+        _lastErrorMeta,
+        lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
+      );
+    }
+    if (data.containsKey('lease_owner')) {
+      context.handle(
+        _leaseOwnerMeta,
+        leaseOwner.isAcceptableOrUnknown(data['lease_owner']!, _leaseOwnerMeta),
+      );
+    }
+    if (data.containsKey('lease_until')) {
+      context.handle(
+        _leaseUntilMeta,
+        leaseUntil.isAcceptableOrUnknown(data['lease_until']!, _leaseUntilMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CommentJobRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CommentJobRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      articleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}article_id'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      trigger: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}trigger'],
+      )!,
+      pickedNetizenIdsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}picked_netizen_ids_json'],
+      )!,
+      attempt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempt'],
+      )!,
+      maxAttempts: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}max_attempts'],
+      )!,
+      lastError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error'],
+      ),
+      leaseOwner: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lease_owner'],
+      ),
+      leaseUntil: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}lease_until'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CommentJobsTable createAlias(String alias) {
+    return $CommentJobsTable(attachedDatabase, alias);
+  }
+}
+
+class CommentJobRow extends DataClass implements Insertable<CommentJobRow> {
+  final String id;
+  final String articleId;
+
+  /// pending | running | completed | failed | cancelled
+  final String status;
+
+  /// off | onBrowse | onOpenComments
+  final String trigger;
+
+  /// JSON array of netizen ids sampled once for this job.
+  final String pickedNetizenIdsJson;
+  final int attempt;
+  final int maxAttempts;
+  final String? lastError;
+  final String? leaseOwner;
+  final DateTime? leaseUntil;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const CommentJobRow({
+    required this.id,
+    required this.articleId,
+    required this.status,
+    required this.trigger,
+    required this.pickedNetizenIdsJson,
+    required this.attempt,
+    required this.maxAttempts,
+    this.lastError,
+    this.leaseOwner,
+    this.leaseUntil,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['article_id'] = Variable<String>(articleId);
+    map['status'] = Variable<String>(status);
+    map['trigger'] = Variable<String>(trigger);
+    map['picked_netizen_ids_json'] = Variable<String>(pickedNetizenIdsJson);
+    map['attempt'] = Variable<int>(attempt);
+    map['max_attempts'] = Variable<int>(maxAttempts);
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
+    if (!nullToAbsent || leaseOwner != null) {
+      map['lease_owner'] = Variable<String>(leaseOwner);
+    }
+    if (!nullToAbsent || leaseUntil != null) {
+      map['lease_until'] = Variable<DateTime>(leaseUntil);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  CommentJobsCompanion toCompanion(bool nullToAbsent) {
+    return CommentJobsCompanion(
+      id: Value(id),
+      articleId: Value(articleId),
+      status: Value(status),
+      trigger: Value(trigger),
+      pickedNetizenIdsJson: Value(pickedNetizenIdsJson),
+      attempt: Value(attempt),
+      maxAttempts: Value(maxAttempts),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
+      leaseOwner: leaseOwner == null && nullToAbsent
+          ? const Value.absent()
+          : Value(leaseOwner),
+      leaseUntil: leaseUntil == null && nullToAbsent
+          ? const Value.absent()
+          : Value(leaseUntil),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory CommentJobRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CommentJobRow(
+      id: serializer.fromJson<String>(json['id']),
+      articleId: serializer.fromJson<String>(json['articleId']),
+      status: serializer.fromJson<String>(json['status']),
+      trigger: serializer.fromJson<String>(json['trigger']),
+      pickedNetizenIdsJson: serializer.fromJson<String>(
+        json['pickedNetizenIdsJson'],
+      ),
+      attempt: serializer.fromJson<int>(json['attempt']),
+      maxAttempts: serializer.fromJson<int>(json['maxAttempts']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
+      leaseOwner: serializer.fromJson<String?>(json['leaseOwner']),
+      leaseUntil: serializer.fromJson<DateTime?>(json['leaseUntil']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'articleId': serializer.toJson<String>(articleId),
+      'status': serializer.toJson<String>(status),
+      'trigger': serializer.toJson<String>(trigger),
+      'pickedNetizenIdsJson': serializer.toJson<String>(pickedNetizenIdsJson),
+      'attempt': serializer.toJson<int>(attempt),
+      'maxAttempts': serializer.toJson<int>(maxAttempts),
+      'lastError': serializer.toJson<String?>(lastError),
+      'leaseOwner': serializer.toJson<String?>(leaseOwner),
+      'leaseUntil': serializer.toJson<DateTime?>(leaseUntil),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  CommentJobRow copyWith({
+    String? id,
+    String? articleId,
+    String? status,
+    String? trigger,
+    String? pickedNetizenIdsJson,
+    int? attempt,
+    int? maxAttempts,
+    Value<String?> lastError = const Value.absent(),
+    Value<String?> leaseOwner = const Value.absent(),
+    Value<DateTime?> leaseUntil = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => CommentJobRow(
+    id: id ?? this.id,
+    articleId: articleId ?? this.articleId,
+    status: status ?? this.status,
+    trigger: trigger ?? this.trigger,
+    pickedNetizenIdsJson: pickedNetizenIdsJson ?? this.pickedNetizenIdsJson,
+    attempt: attempt ?? this.attempt,
+    maxAttempts: maxAttempts ?? this.maxAttempts,
+    lastError: lastError.present ? lastError.value : this.lastError,
+    leaseOwner: leaseOwner.present ? leaseOwner.value : this.leaseOwner,
+    leaseUntil: leaseUntil.present ? leaseUntil.value : this.leaseUntil,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  CommentJobRow copyWithCompanion(CommentJobsCompanion data) {
+    return CommentJobRow(
+      id: data.id.present ? data.id.value : this.id,
+      articleId: data.articleId.present ? data.articleId.value : this.articleId,
+      status: data.status.present ? data.status.value : this.status,
+      trigger: data.trigger.present ? data.trigger.value : this.trigger,
+      pickedNetizenIdsJson: data.pickedNetizenIdsJson.present
+          ? data.pickedNetizenIdsJson.value
+          : this.pickedNetizenIdsJson,
+      attempt: data.attempt.present ? data.attempt.value : this.attempt,
+      maxAttempts: data.maxAttempts.present
+          ? data.maxAttempts.value
+          : this.maxAttempts,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      leaseOwner: data.leaseOwner.present
+          ? data.leaseOwner.value
+          : this.leaseOwner,
+      leaseUntil: data.leaseUntil.present
+          ? data.leaseUntil.value
+          : this.leaseUntil,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CommentJobRow(')
+          ..write('id: $id, ')
+          ..write('articleId: $articleId, ')
+          ..write('status: $status, ')
+          ..write('trigger: $trigger, ')
+          ..write('pickedNetizenIdsJson: $pickedNetizenIdsJson, ')
+          ..write('attempt: $attempt, ')
+          ..write('maxAttempts: $maxAttempts, ')
+          ..write('lastError: $lastError, ')
+          ..write('leaseOwner: $leaseOwner, ')
+          ..write('leaseUntil: $leaseUntil, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    articleId,
+    status,
+    trigger,
+    pickedNetizenIdsJson,
+    attempt,
+    maxAttempts,
+    lastError,
+    leaseOwner,
+    leaseUntil,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CommentJobRow &&
+          other.id == this.id &&
+          other.articleId == this.articleId &&
+          other.status == this.status &&
+          other.trigger == this.trigger &&
+          other.pickedNetizenIdsJson == this.pickedNetizenIdsJson &&
+          other.attempt == this.attempt &&
+          other.maxAttempts == this.maxAttempts &&
+          other.lastError == this.lastError &&
+          other.leaseOwner == this.leaseOwner &&
+          other.leaseUntil == this.leaseUntil &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CommentJobsCompanion extends UpdateCompanion<CommentJobRow> {
+  final Value<String> id;
+  final Value<String> articleId;
+  final Value<String> status;
+  final Value<String> trigger;
+  final Value<String> pickedNetizenIdsJson;
+  final Value<int> attempt;
+  final Value<int> maxAttempts;
+  final Value<String?> lastError;
+  final Value<String?> leaseOwner;
+  final Value<DateTime?> leaseUntil;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const CommentJobsCompanion({
+    this.id = const Value.absent(),
+    this.articleId = const Value.absent(),
+    this.status = const Value.absent(),
+    this.trigger = const Value.absent(),
+    this.pickedNetizenIdsJson = const Value.absent(),
+    this.attempt = const Value.absent(),
+    this.maxAttempts = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.leaseOwner = const Value.absent(),
+    this.leaseUntil = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CommentJobsCompanion.insert({
+    required String id,
+    required String articleId,
+    required String status,
+    required String trigger,
+    this.pickedNetizenIdsJson = const Value.absent(),
+    this.attempt = const Value.absent(),
+    this.maxAttempts = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.leaseOwner = const Value.absent(),
+    this.leaseUntil = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       articleId = Value(articleId),
+       status = Value(status),
+       trigger = Value(trigger),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<CommentJobRow> custom({
+    Expression<String>? id,
+    Expression<String>? articleId,
+    Expression<String>? status,
+    Expression<String>? trigger,
+    Expression<String>? pickedNetizenIdsJson,
+    Expression<int>? attempt,
+    Expression<int>? maxAttempts,
+    Expression<String>? lastError,
+    Expression<String>? leaseOwner,
+    Expression<DateTime>? leaseUntil,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (articleId != null) 'article_id': articleId,
+      if (status != null) 'status': status,
+      if (trigger != null) 'trigger': trigger,
+      if (pickedNetizenIdsJson != null)
+        'picked_netizen_ids_json': pickedNetizenIdsJson,
+      if (attempt != null) 'attempt': attempt,
+      if (maxAttempts != null) 'max_attempts': maxAttempts,
+      if (lastError != null) 'last_error': lastError,
+      if (leaseOwner != null) 'lease_owner': leaseOwner,
+      if (leaseUntil != null) 'lease_until': leaseUntil,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CommentJobsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? articleId,
+    Value<String>? status,
+    Value<String>? trigger,
+    Value<String>? pickedNetizenIdsJson,
+    Value<int>? attempt,
+    Value<int>? maxAttempts,
+    Value<String?>? lastError,
+    Value<String?>? leaseOwner,
+    Value<DateTime?>? leaseUntil,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CommentJobsCompanion(
+      id: id ?? this.id,
+      articleId: articleId ?? this.articleId,
+      status: status ?? this.status,
+      trigger: trigger ?? this.trigger,
+      pickedNetizenIdsJson: pickedNetizenIdsJson ?? this.pickedNetizenIdsJson,
+      attempt: attempt ?? this.attempt,
+      maxAttempts: maxAttempts ?? this.maxAttempts,
+      lastError: lastError ?? this.lastError,
+      leaseOwner: leaseOwner ?? this.leaseOwner,
+      leaseUntil: leaseUntil ?? this.leaseUntil,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (articleId.present) {
+      map['article_id'] = Variable<String>(articleId.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (trigger.present) {
+      map['trigger'] = Variable<String>(trigger.value);
+    }
+    if (pickedNetizenIdsJson.present) {
+      map['picked_netizen_ids_json'] = Variable<String>(
+        pickedNetizenIdsJson.value,
+      );
+    }
+    if (attempt.present) {
+      map['attempt'] = Variable<int>(attempt.value);
+    }
+    if (maxAttempts.present) {
+      map['max_attempts'] = Variable<int>(maxAttempts.value);
+    }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
+    if (leaseOwner.present) {
+      map['lease_owner'] = Variable<String>(leaseOwner.value);
+    }
+    if (leaseUntil.present) {
+      map['lease_until'] = Variable<DateTime>(leaseUntil.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CommentJobsCompanion(')
+          ..write('id: $id, ')
+          ..write('articleId: $articleId, ')
+          ..write('status: $status, ')
+          ..write('trigger: $trigger, ')
+          ..write('pickedNetizenIdsJson: $pickedNetizenIdsJson, ')
+          ..write('attempt: $attempt, ')
+          ..write('maxAttempts: $maxAttempts, ')
+          ..write('lastError: $lastError, ')
+          ..write('leaseOwner: $leaseOwner, ')
+          ..write('leaseUntil: $leaseUntil, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CommentJobItemsTable extends CommentJobItems
+    with TableInfo<$CommentJobItemsTable, CommentJobItemRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CommentJobItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _jobIdMeta = const VerificationMeta('jobId');
+  @override
+  late final GeneratedColumn<String> jobId = GeneratedColumn<String>(
+    'job_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES comment_jobs (id)',
+    ),
+  );
+  static const VerificationMeta _netizenIdMeta = const VerificationMeta(
+    'netizenId',
+  );
+  @override
+  late final GeneratedColumn<String> netizenId = GeneratedColumn<String>(
+    'netizen_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _attemptMeta = const VerificationMeta(
+    'attempt',
+  );
+  @override
+  late final GeneratedColumn<int> attempt = GeneratedColumn<int>(
+    'attempt',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastErrorMeta = const VerificationMeta(
+    'lastError',
+  );
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+    'last_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _commentIdMeta = const VerificationMeta(
+    'commentId',
+  );
+  @override
+  late final GeneratedColumn<String> commentId = GeneratedColumn<String>(
+    'comment_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    jobId,
+    netizenId,
+    status,
+    attempt,
+    lastError,
+    commentId,
+    sortOrder,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'comment_job_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CommentJobItemRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('job_id')) {
+      context.handle(
+        _jobIdMeta,
+        jobId.isAcceptableOrUnknown(data['job_id']!, _jobIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_jobIdMeta);
+    }
+    if (data.containsKey('netizen_id')) {
+      context.handle(
+        _netizenIdMeta,
+        netizenId.isAcceptableOrUnknown(data['netizen_id']!, _netizenIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_netizenIdMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('attempt')) {
+      context.handle(
+        _attemptMeta,
+        attempt.isAcceptableOrUnknown(data['attempt']!, _attemptMeta),
+      );
+    }
+    if (data.containsKey('last_error')) {
+      context.handle(
+        _lastErrorMeta,
+        lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
+      );
+    }
+    if (data.containsKey('comment_id')) {
+      context.handle(
+        _commentIdMeta,
+        commentId.isAcceptableOrUnknown(data['comment_id']!, _commentIdMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CommentJobItemRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CommentJobItemRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      jobId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}job_id'],
+      )!,
+      netizenId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}netizen_id'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      attempt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempt'],
+      )!,
+      lastError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error'],
+      ),
+      commentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}comment_id'],
+      ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CommentJobItemsTable createAlias(String alias) {
+    return $CommentJobItemsTable(attachedDatabase, alias);
+  }
+}
+
+class CommentJobItemRow extends DataClass
+    implements Insertable<CommentJobItemRow> {
+  final String id;
+  final String jobId;
+  final String netizenId;
+
+  /// pending | running | succeeded | skipped | failed
+  final String status;
+  final int attempt;
+  final String? lastError;
+  final String? commentId;
+  final int sortOrder;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const CommentJobItemRow({
+    required this.id,
+    required this.jobId,
+    required this.netizenId,
+    required this.status,
+    required this.attempt,
+    this.lastError,
+    this.commentId,
+    required this.sortOrder,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['job_id'] = Variable<String>(jobId);
+    map['netizen_id'] = Variable<String>(netizenId);
+    map['status'] = Variable<String>(status);
+    map['attempt'] = Variable<int>(attempt);
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
+    if (!nullToAbsent || commentId != null) {
+      map['comment_id'] = Variable<String>(commentId);
+    }
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  CommentJobItemsCompanion toCompanion(bool nullToAbsent) {
+    return CommentJobItemsCompanion(
+      id: Value(id),
+      jobId: Value(jobId),
+      netizenId: Value(netizenId),
+      status: Value(status),
+      attempt: Value(attempt),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
+      commentId: commentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(commentId),
+      sortOrder: Value(sortOrder),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory CommentJobItemRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CommentJobItemRow(
+      id: serializer.fromJson<String>(json['id']),
+      jobId: serializer.fromJson<String>(json['jobId']),
+      netizenId: serializer.fromJson<String>(json['netizenId']),
+      status: serializer.fromJson<String>(json['status']),
+      attempt: serializer.fromJson<int>(json['attempt']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
+      commentId: serializer.fromJson<String?>(json['commentId']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'jobId': serializer.toJson<String>(jobId),
+      'netizenId': serializer.toJson<String>(netizenId),
+      'status': serializer.toJson<String>(status),
+      'attempt': serializer.toJson<int>(attempt),
+      'lastError': serializer.toJson<String?>(lastError),
+      'commentId': serializer.toJson<String?>(commentId),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  CommentJobItemRow copyWith({
+    String? id,
+    String? jobId,
+    String? netizenId,
+    String? status,
+    int? attempt,
+    Value<String?> lastError = const Value.absent(),
+    Value<String?> commentId = const Value.absent(),
+    int? sortOrder,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => CommentJobItemRow(
+    id: id ?? this.id,
+    jobId: jobId ?? this.jobId,
+    netizenId: netizenId ?? this.netizenId,
+    status: status ?? this.status,
+    attempt: attempt ?? this.attempt,
+    lastError: lastError.present ? lastError.value : this.lastError,
+    commentId: commentId.present ? commentId.value : this.commentId,
+    sortOrder: sortOrder ?? this.sortOrder,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  CommentJobItemRow copyWithCompanion(CommentJobItemsCompanion data) {
+    return CommentJobItemRow(
+      id: data.id.present ? data.id.value : this.id,
+      jobId: data.jobId.present ? data.jobId.value : this.jobId,
+      netizenId: data.netizenId.present ? data.netizenId.value : this.netizenId,
+      status: data.status.present ? data.status.value : this.status,
+      attempt: data.attempt.present ? data.attempt.value : this.attempt,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      commentId: data.commentId.present ? data.commentId.value : this.commentId,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CommentJobItemRow(')
+          ..write('id: $id, ')
+          ..write('jobId: $jobId, ')
+          ..write('netizenId: $netizenId, ')
+          ..write('status: $status, ')
+          ..write('attempt: $attempt, ')
+          ..write('lastError: $lastError, ')
+          ..write('commentId: $commentId, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    jobId,
+    netizenId,
+    status,
+    attempt,
+    lastError,
+    commentId,
+    sortOrder,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CommentJobItemRow &&
+          other.id == this.id &&
+          other.jobId == this.jobId &&
+          other.netizenId == this.netizenId &&
+          other.status == this.status &&
+          other.attempt == this.attempt &&
+          other.lastError == this.lastError &&
+          other.commentId == this.commentId &&
+          other.sortOrder == this.sortOrder &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CommentJobItemsCompanion extends UpdateCompanion<CommentJobItemRow> {
+  final Value<String> id;
+  final Value<String> jobId;
+  final Value<String> netizenId;
+  final Value<String> status;
+  final Value<int> attempt;
+  final Value<String?> lastError;
+  final Value<String?> commentId;
+  final Value<int> sortOrder;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const CommentJobItemsCompanion({
+    this.id = const Value.absent(),
+    this.jobId = const Value.absent(),
+    this.netizenId = const Value.absent(),
+    this.status = const Value.absent(),
+    this.attempt = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.commentId = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CommentJobItemsCompanion.insert({
+    required String id,
+    required String jobId,
+    required String netizenId,
+    required String status,
+    this.attempt = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.commentId = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       jobId = Value(jobId),
+       netizenId = Value(netizenId),
+       status = Value(status),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<CommentJobItemRow> custom({
+    Expression<String>? id,
+    Expression<String>? jobId,
+    Expression<String>? netizenId,
+    Expression<String>? status,
+    Expression<int>? attempt,
+    Expression<String>? lastError,
+    Expression<String>? commentId,
+    Expression<int>? sortOrder,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (jobId != null) 'job_id': jobId,
+      if (netizenId != null) 'netizen_id': netizenId,
+      if (status != null) 'status': status,
+      if (attempt != null) 'attempt': attempt,
+      if (lastError != null) 'last_error': lastError,
+      if (commentId != null) 'comment_id': commentId,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CommentJobItemsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? jobId,
+    Value<String>? netizenId,
+    Value<String>? status,
+    Value<int>? attempt,
+    Value<String?>? lastError,
+    Value<String?>? commentId,
+    Value<int>? sortOrder,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CommentJobItemsCompanion(
+      id: id ?? this.id,
+      jobId: jobId ?? this.jobId,
+      netizenId: netizenId ?? this.netizenId,
+      status: status ?? this.status,
+      attempt: attempt ?? this.attempt,
+      lastError: lastError ?? this.lastError,
+      commentId: commentId ?? this.commentId,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (jobId.present) {
+      map['job_id'] = Variable<String>(jobId.value);
+    }
+    if (netizenId.present) {
+      map['netizen_id'] = Variable<String>(netizenId.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (attempt.present) {
+      map['attempt'] = Variable<int>(attempt.value);
+    }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
+    if (commentId.present) {
+      map['comment_id'] = Variable<String>(commentId.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CommentJobItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('jobId: $jobId, ')
+          ..write('netizenId: $netizenId, ')
+          ..write('status: $status, ')
+          ..write('attempt: $attempt, ')
+          ..write('lastError: $lastError, ')
+          ..write('commentId: $commentId, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6477,6 +8077,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $LlmModelsTable llmModels = $LlmModelsTable(this);
   late final $NetizensTable netizens = $NetizensTable(this);
   late final $CommentsTable comments = $CommentsTable(this);
+  late final $CommentJobsTable commentJobs = $CommentJobsTable(this);
+  late final $CommentJobItemsTable commentJobItems = $CommentJobItemsTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6494,6 +8098,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     llmModels,
     netizens,
     comments,
+    commentJobs,
+    commentJobItems,
   ];
 }
 
@@ -6898,6 +8504,11 @@ typedef $$ArticlesTableCreateCompanionBuilder =
       Value<String?> contentHtml,
       Value<String> contentText,
       Value<String?> imageUrl,
+      Value<String> mediaType,
+      Value<String?> enclosureUrl,
+      Value<String?> enclosureMime,
+      Value<int?> enclosureLength,
+      Value<int?> durationSeconds,
       Value<double> imageAspect,
       Value<bool> featured,
       Value<String> tagsJson,
@@ -6921,6 +8532,11 @@ typedef $$ArticlesTableUpdateCompanionBuilder =
       Value<String?> contentHtml,
       Value<String> contentText,
       Value<String?> imageUrl,
+      Value<String> mediaType,
+      Value<String?> enclosureUrl,
+      Value<String?> enclosureMime,
+      Value<int?> enclosureLength,
+      Value<int?> durationSeconds,
       Value<double> imageAspect,
       Value<bool> featured,
       Value<String> tagsJson,
@@ -7006,6 +8622,31 @@ class $$ArticlesTableFilterComposer
 
   ColumnFilters<String> get imageUrl => $composableBuilder(
     column: $table.imageUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mediaType => $composableBuilder(
+    column: $table.mediaType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get enclosureUrl => $composableBuilder(
+    column: $table.enclosureUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get enclosureMime => $composableBuilder(
+    column: $table.enclosureMime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get enclosureLength => $composableBuilder(
+    column: $table.enclosureLength,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7132,6 +8773,31 @@ class $$ArticlesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get mediaType => $composableBuilder(
+    column: $table.mediaType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get enclosureUrl => $composableBuilder(
+    column: $table.enclosureUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get enclosureMime => $composableBuilder(
+    column: $table.enclosureMime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get enclosureLength => $composableBuilder(
+    column: $table.enclosureLength,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get imageAspect => $composableBuilder(
     column: $table.imageAspect,
     builder: (column) => ColumnOrderings(column),
@@ -7241,6 +8907,29 @@ class $$ArticlesTableAnnotationComposer
   GeneratedColumn<String> get imageUrl =>
       $composableBuilder(column: $table.imageUrl, builder: (column) => column);
 
+  GeneratedColumn<String> get mediaType =>
+      $composableBuilder(column: $table.mediaType, builder: (column) => column);
+
+  GeneratedColumn<String> get enclosureUrl => $composableBuilder(
+    column: $table.enclosureUrl,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get enclosureMime => $composableBuilder(
+    column: $table.enclosureMime,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get enclosureLength => $composableBuilder(
+    column: $table.enclosureLength,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<double> get imageAspect => $composableBuilder(
     column: $table.imageAspect,
     builder: (column) => column,
@@ -7338,6 +9027,11 @@ class $$ArticlesTableTableManager
                 Value<String?> contentHtml = const Value.absent(),
                 Value<String> contentText = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
+                Value<String> mediaType = const Value.absent(),
+                Value<String?> enclosureUrl = const Value.absent(),
+                Value<String?> enclosureMime = const Value.absent(),
+                Value<int?> enclosureLength = const Value.absent(),
+                Value<int?> durationSeconds = const Value.absent(),
                 Value<double> imageAspect = const Value.absent(),
                 Value<bool> featured = const Value.absent(),
                 Value<String> tagsJson = const Value.absent(),
@@ -7359,6 +9053,11 @@ class $$ArticlesTableTableManager
                 contentHtml: contentHtml,
                 contentText: contentText,
                 imageUrl: imageUrl,
+                mediaType: mediaType,
+                enclosureUrl: enclosureUrl,
+                enclosureMime: enclosureMime,
+                enclosureLength: enclosureLength,
+                durationSeconds: durationSeconds,
                 imageAspect: imageAspect,
                 featured: featured,
                 tagsJson: tagsJson,
@@ -7382,6 +9081,11 @@ class $$ArticlesTableTableManager
                 Value<String?> contentHtml = const Value.absent(),
                 Value<String> contentText = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
+                Value<String> mediaType = const Value.absent(),
+                Value<String?> enclosureUrl = const Value.absent(),
+                Value<String?> enclosureMime = const Value.absent(),
+                Value<int?> enclosureLength = const Value.absent(),
+                Value<int?> durationSeconds = const Value.absent(),
                 Value<double> imageAspect = const Value.absent(),
                 Value<bool> featured = const Value.absent(),
                 Value<String> tagsJson = const Value.absent(),
@@ -7403,6 +9107,11 @@ class $$ArticlesTableTableManager
                 contentHtml: contentHtml,
                 contentText: contentText,
                 imageUrl: imageUrl,
+                mediaType: mediaType,
+                enclosureUrl: enclosureUrl,
+                enclosureMime: enclosureMime,
+                enclosureLength: enclosureLength,
+                durationSeconds: durationSeconds,
                 imageAspect: imageAspect,
                 featured: featured,
                 tagsJson: tagsJson,
@@ -10370,6 +12079,877 @@ typedef $$CommentsTableProcessedTableManager =
       CommentRow,
       PrefetchHooks Function()
     >;
+typedef $$CommentJobsTableCreateCompanionBuilder =
+    CommentJobsCompanion Function({
+      required String id,
+      required String articleId,
+      required String status,
+      required String trigger,
+      Value<String> pickedNetizenIdsJson,
+      Value<int> attempt,
+      Value<int> maxAttempts,
+      Value<String?> lastError,
+      Value<String?> leaseOwner,
+      Value<DateTime?> leaseUntil,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CommentJobsTableUpdateCompanionBuilder =
+    CommentJobsCompanion Function({
+      Value<String> id,
+      Value<String> articleId,
+      Value<String> status,
+      Value<String> trigger,
+      Value<String> pickedNetizenIdsJson,
+      Value<int> attempt,
+      Value<int> maxAttempts,
+      Value<String?> lastError,
+      Value<String?> leaseOwner,
+      Value<DateTime?> leaseUntil,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$CommentJobsTableReferences
+    extends BaseReferences<_$AppDatabase, $CommentJobsTable, CommentJobRow> {
+  $$CommentJobsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$CommentJobItemsTable, List<CommentJobItemRow>>
+  _commentJobItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.commentJobItems,
+    aliasName: 'comment_jobs__id__comment_job_items__job_id',
+  );
+
+  $$CommentJobItemsTableProcessedTableManager get commentJobItemsRefs {
+    final manager = $$CommentJobItemsTableTableManager(
+      $_db,
+      $_db.commentJobItems,
+    ).filter((f) => f.jobId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _commentJobItemsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$CommentJobsTableFilterComposer
+    extends Composer<_$AppDatabase, $CommentJobsTable> {
+  $$CommentJobsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get articleId => $composableBuilder(
+    column: $table.articleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get trigger => $composableBuilder(
+    column: $table.trigger,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pickedNetizenIdsJson => $composableBuilder(
+    column: $table.pickedNetizenIdsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attempt => $composableBuilder(
+    column: $table.attempt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get maxAttempts => $composableBuilder(
+    column: $table.maxAttempts,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get leaseOwner => $composableBuilder(
+    column: $table.leaseOwner,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get leaseUntil => $composableBuilder(
+    column: $table.leaseUntil,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> commentJobItemsRefs(
+    Expression<bool> Function($$CommentJobItemsTableFilterComposer f) f,
+  ) {
+    final $$CommentJobItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.commentJobItems,
+      getReferencedColumn: (t) => t.jobId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CommentJobItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.commentJobItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$CommentJobsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CommentJobsTable> {
+  $$CommentJobsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get articleId => $composableBuilder(
+    column: $table.articleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get trigger => $composableBuilder(
+    column: $table.trigger,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pickedNetizenIdsJson => $composableBuilder(
+    column: $table.pickedNetizenIdsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attempt => $composableBuilder(
+    column: $table.attempt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get maxAttempts => $composableBuilder(
+    column: $table.maxAttempts,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get leaseOwner => $composableBuilder(
+    column: $table.leaseOwner,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get leaseUntil => $composableBuilder(
+    column: $table.leaseUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CommentJobsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CommentJobsTable> {
+  $$CommentJobsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get articleId =>
+      $composableBuilder(column: $table.articleId, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get trigger =>
+      $composableBuilder(column: $table.trigger, builder: (column) => column);
+
+  GeneratedColumn<String> get pickedNetizenIdsJson => $composableBuilder(
+    column: $table.pickedNetizenIdsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get attempt =>
+      $composableBuilder(column: $table.attempt, builder: (column) => column);
+
+  GeneratedColumn<int> get maxAttempts => $composableBuilder(
+    column: $table.maxAttempts,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<String> get leaseOwner => $composableBuilder(
+    column: $table.leaseOwner,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get leaseUntil => $composableBuilder(
+    column: $table.leaseUntil,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> commentJobItemsRefs<T extends Object>(
+    Expression<T> Function($$CommentJobItemsTableAnnotationComposer a) f,
+  ) {
+    final $$CommentJobItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.commentJobItems,
+      getReferencedColumn: (t) => t.jobId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CommentJobItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.commentJobItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$CommentJobsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CommentJobsTable,
+          CommentJobRow,
+          $$CommentJobsTableFilterComposer,
+          $$CommentJobsTableOrderingComposer,
+          $$CommentJobsTableAnnotationComposer,
+          $$CommentJobsTableCreateCompanionBuilder,
+          $$CommentJobsTableUpdateCompanionBuilder,
+          (CommentJobRow, $$CommentJobsTableReferences),
+          CommentJobRow,
+          PrefetchHooks Function({bool commentJobItemsRefs})
+        > {
+  $$CommentJobsTableTableManager(_$AppDatabase db, $CommentJobsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CommentJobsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CommentJobsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CommentJobsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> articleId = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> trigger = const Value.absent(),
+                Value<String> pickedNetizenIdsJson = const Value.absent(),
+                Value<int> attempt = const Value.absent(),
+                Value<int> maxAttempts = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<String?> leaseOwner = const Value.absent(),
+                Value<DateTime?> leaseUntil = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CommentJobsCompanion(
+                id: id,
+                articleId: articleId,
+                status: status,
+                trigger: trigger,
+                pickedNetizenIdsJson: pickedNetizenIdsJson,
+                attempt: attempt,
+                maxAttempts: maxAttempts,
+                lastError: lastError,
+                leaseOwner: leaseOwner,
+                leaseUntil: leaseUntil,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String articleId,
+                required String status,
+                required String trigger,
+                Value<String> pickedNetizenIdsJson = const Value.absent(),
+                Value<int> attempt = const Value.absent(),
+                Value<int> maxAttempts = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<String?> leaseOwner = const Value.absent(),
+                Value<DateTime?> leaseUntil = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CommentJobsCompanion.insert(
+                id: id,
+                articleId: articleId,
+                status: status,
+                trigger: trigger,
+                pickedNetizenIdsJson: pickedNetizenIdsJson,
+                attempt: attempt,
+                maxAttempts: maxAttempts,
+                lastError: lastError,
+                leaseOwner: leaseOwner,
+                leaseUntil: leaseUntil,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$CommentJobsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({commentJobItemsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (commentJobItemsRefs) db.commentJobItems,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (commentJobItemsRefs)
+                    await $_getPrefetchedData<
+                      CommentJobRow,
+                      $CommentJobsTable,
+                      CommentJobItemRow
+                    >(
+                      currentTable: table,
+                      referencedTable: $$CommentJobsTableReferences
+                          ._commentJobItemsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$CommentJobsTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).commentJobItemsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.jobId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$CommentJobsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CommentJobsTable,
+      CommentJobRow,
+      $$CommentJobsTableFilterComposer,
+      $$CommentJobsTableOrderingComposer,
+      $$CommentJobsTableAnnotationComposer,
+      $$CommentJobsTableCreateCompanionBuilder,
+      $$CommentJobsTableUpdateCompanionBuilder,
+      (CommentJobRow, $$CommentJobsTableReferences),
+      CommentJobRow,
+      PrefetchHooks Function({bool commentJobItemsRefs})
+    >;
+typedef $$CommentJobItemsTableCreateCompanionBuilder =
+    CommentJobItemsCompanion Function({
+      required String id,
+      required String jobId,
+      required String netizenId,
+      required String status,
+      Value<int> attempt,
+      Value<String?> lastError,
+      Value<String?> commentId,
+      Value<int> sortOrder,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CommentJobItemsTableUpdateCompanionBuilder =
+    CommentJobItemsCompanion Function({
+      Value<String> id,
+      Value<String> jobId,
+      Value<String> netizenId,
+      Value<String> status,
+      Value<int> attempt,
+      Value<String?> lastError,
+      Value<String?> commentId,
+      Value<int> sortOrder,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$CommentJobItemsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $CommentJobItemsTable,
+          CommentJobItemRow
+        > {
+  $$CommentJobItemsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CommentJobsTable _jobIdTable(_$AppDatabase db) =>
+      db.commentJobs.createAlias('comment_job_items__job_id__comment_jobs__id');
+
+  $$CommentJobsTableProcessedTableManager get jobId {
+    final $_column = $_itemColumn<String>('job_id')!;
+
+    final manager = $$CommentJobsTableTableManager(
+      $_db,
+      $_db.commentJobs,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_jobIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$CommentJobItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $CommentJobItemsTable> {
+  $$CommentJobItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get netizenId => $composableBuilder(
+    column: $table.netizenId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attempt => $composableBuilder(
+    column: $table.attempt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get commentId => $composableBuilder(
+    column: $table.commentId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CommentJobsTableFilterComposer get jobId {
+    final $$CommentJobsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.jobId,
+      referencedTable: $db.commentJobs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CommentJobsTableFilterComposer(
+            $db: $db,
+            $table: $db.commentJobs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CommentJobItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CommentJobItemsTable> {
+  $$CommentJobItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get netizenId => $composableBuilder(
+    column: $table.netizenId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attempt => $composableBuilder(
+    column: $table.attempt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get commentId => $composableBuilder(
+    column: $table.commentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CommentJobsTableOrderingComposer get jobId {
+    final $$CommentJobsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.jobId,
+      referencedTable: $db.commentJobs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CommentJobsTableOrderingComposer(
+            $db: $db,
+            $table: $db.commentJobs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CommentJobItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CommentJobItemsTable> {
+  $$CommentJobItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get netizenId =>
+      $composableBuilder(column: $table.netizenId, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get attempt =>
+      $composableBuilder(column: $table.attempt, builder: (column) => column);
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<String> get commentId =>
+      $composableBuilder(column: $table.commentId, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$CommentJobsTableAnnotationComposer get jobId {
+    final $$CommentJobsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.jobId,
+      referencedTable: $db.commentJobs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CommentJobsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.commentJobs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CommentJobItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CommentJobItemsTable,
+          CommentJobItemRow,
+          $$CommentJobItemsTableFilterComposer,
+          $$CommentJobItemsTableOrderingComposer,
+          $$CommentJobItemsTableAnnotationComposer,
+          $$CommentJobItemsTableCreateCompanionBuilder,
+          $$CommentJobItemsTableUpdateCompanionBuilder,
+          (CommentJobItemRow, $$CommentJobItemsTableReferences),
+          CommentJobItemRow,
+          PrefetchHooks Function({bool jobId})
+        > {
+  $$CommentJobItemsTableTableManager(
+    _$AppDatabase db,
+    $CommentJobItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CommentJobItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CommentJobItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CommentJobItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> jobId = const Value.absent(),
+                Value<String> netizenId = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int> attempt = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<String?> commentId = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CommentJobItemsCompanion(
+                id: id,
+                jobId: jobId,
+                netizenId: netizenId,
+                status: status,
+                attempt: attempt,
+                lastError: lastError,
+                commentId: commentId,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String jobId,
+                required String netizenId,
+                required String status,
+                Value<int> attempt = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<String?> commentId = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CommentJobItemsCompanion.insert(
+                id: id,
+                jobId: jobId,
+                netizenId: netizenId,
+                status: status,
+                attempt: attempt,
+                lastError: lastError,
+                commentId: commentId,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$CommentJobItemsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({jobId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (jobId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.jobId,
+                                referencedTable:
+                                    $$CommentJobItemsTableReferences
+                                        ._jobIdTable(db),
+                                referencedColumn:
+                                    $$CommentJobItemsTableReferences
+                                        ._jobIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$CommentJobItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CommentJobItemsTable,
+      CommentJobItemRow,
+      $$CommentJobItemsTableFilterComposer,
+      $$CommentJobItemsTableOrderingComposer,
+      $$CommentJobItemsTableAnnotationComposer,
+      $$CommentJobItemsTableCreateCompanionBuilder,
+      $$CommentJobItemsTableUpdateCompanionBuilder,
+      (CommentJobItemRow, $$CommentJobItemsTableReferences),
+      CommentJobItemRow,
+      PrefetchHooks Function({bool jobId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10398,4 +12978,8 @@ class $AppDatabaseManager {
       $$NetizensTableTableManager(_db, _db.netizens);
   $$CommentsTableTableManager get comments =>
       $$CommentsTableTableManager(_db, _db.comments);
+  $$CommentJobsTableTableManager get commentJobs =>
+      $$CommentJobsTableTableManager(_db, _db.commentJobs);
+  $$CommentJobItemsTableTableManager get commentJobItems =>
+      $$CommentJobItemsTableTableManager(_db, _db.commentJobItems);
 }

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wepseed/data/models/models.dart';
 import 'package:wepseed/data/rss/opml.dart';
 import 'package:wepseed/data/rss/rss_parser.dart';
 
@@ -60,5 +61,67 @@ void main() {
     expect(feed.items[0].guid, 'https://t.test/a');
     expect(feed.items[1].guid, isNotEmpty);
     expect(feed.items[1].guid.length, 40); // sha1 hex
+  });
+
+  test('parses audio enclosure and podcast duration', () {
+    const xml = '''
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+<channel><title>Podcast</title><link>https://pod.test</link>
+<item><title>Episode</title><guid>episode-1</guid>
+<description><![CDATA[<p>Show notes</p>]]></description>
+<enclosure url="https://cdn.test/episode.mp3" type="audio/mpeg" length="12345" />
+<itunes:duration>01:02:03</itunes:duration></item>
+</channel></rss>
+''';
+    final item = RssParser().parse(xml).items.single;
+    expect(item.mediaType, ArticleMediaType.audio);
+    expect(item.enclosureUrl, 'https://cdn.test/episode.mp3');
+    expect(item.enclosureMime, 'audio/mpeg');
+    expect(item.enclosureLength, 12345);
+    expect(item.durationSeconds, 3723);
+    expect(item.contentText, 'Show notes');
+  });
+
+  test('parses video media:content without treating stream as image', () {
+    const xml = '''
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+<channel><title>Video</title><link>https://video.test</link>
+<item><title>Clip</title><guid>clip-1</guid>
+<media:content url="https://cdn.test/clip.m3u8" type="application/x-mpegURL" medium="video" duration="95" />
+<media:thumbnail url="https://cdn.test/poster.jpg" /></item>
+</channel></rss>
+''';
+    final item = RssParser().parse(xml).items.single;
+    expect(item.mediaType, ArticleMediaType.video);
+    expect(item.enclosureUrl, 'https://cdn.test/clip.m3u8');
+    expect(item.imageUrl, 'https://cdn.test/poster.jpg');
+    expect(item.durationSeconds, 95);
+  });
+
+  test('parses Atom enclosure and infers type from URL extension', () {
+    const xml = '''
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Atom Audio</title>
+<entry><title>Track</title><id>track-1</id><updated>2026-07-17T00:00:00Z</updated>
+<link rel="alternate" href="https://atom.test/track" />
+<link rel="enclosure" href="https://cdn.test/track.m4a?token=1" length="99" />
+</entry></feed>
+''';
+    final item = RssParser().parse(xml).items.single;
+    expect(item.mediaType, ArticleMediaType.audio);
+    expect(item.enclosureUrl, contains('track.m4a'));
+    expect(item.link, 'https://atom.test/track');
+  });
+
+  test('image enclosure remains a blog article', () {
+    const xml = '''
+<rss version="2.0"><channel><title>Blog</title><link>https://blog.test</link>
+<item><title>Post</title><guid>post</guid>
+<enclosure url="https://cdn.test/cover.jpg" type="image/jpeg" />
+</item></channel></rss>
+''';
+    final item = RssParser().parse(xml).items.single;
+    expect(item.mediaType, ArticleMediaType.blog);
+    expect(item.enclosureUrl, isNull);
+    expect(item.imageUrl, 'https://cdn.test/cover.jpg');
   });
 }

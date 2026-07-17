@@ -1,3 +1,5 @@
+import '../models/models.dart';
+
 /// Parsed feed metadata + items (parser output, not yet domain Article).
 class ParsedFeed {
   const ParsedFeed({
@@ -22,6 +24,11 @@ class ParsedItem {
     this.contentHtml,
     this.contentText = '',
     this.imageUrl,
+    this.mediaType = ArticleMediaType.blog,
+    this.enclosureUrl,
+    this.enclosureMime,
+    this.enclosureLength,
+    this.durationSeconds,
   });
 
   final String guid;
@@ -32,6 +39,11 @@ class ParsedItem {
   final String? contentHtml;
   final String contentText;
   final String? imageUrl;
+  final ArticleMediaType mediaType;
+  final String? enclosureUrl;
+  final String? enclosureMime;
+  final int? enclosureLength;
+  final int? durationSeconds;
   final DateTime publishedAt;
 }
 

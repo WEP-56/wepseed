@@ -5,10 +5,7 @@ export '../../widgets/edge_scrubber.dart';
 /// Pull h1–h3 titles from HTML for the detail scrubber (order preserved).
 List<({String title, int level})> extractHeadingMeta(String? html) {
   if (html == null || html.trim().isEmpty) return const [];
-  final re = RegExp(
-    r'<h([1-3])\b[^>]*>([\s\S]*?)</h\1>',
-    caseSensitive: false,
-  );
+  final re = RegExp(r'<h([1-3])\b[^>]*>([\s\S]*?)</h\1>', caseSensitive: false);
   final out = <({String title, int level})>[];
   for (final m in re.allMatches(html)) {
     final level = int.tryParse(m.group(1) ?? '2') ?? 2;
@@ -43,9 +40,7 @@ String injectTocMarkers(String html, int count) {
 List<ScrubEntry> scrubEntriesFromHeadings(
   List<({String title, int level})> meta,
 ) {
-  return [
-    for (final m in meta) ScrubEntry(label: m.title, level: m.level),
-  ];
+  return [for (final m in meta) ScrubEntry(label: m.title, level: m.level)];
 }
 
 String _stripTags(String s) {

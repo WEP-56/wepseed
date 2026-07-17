@@ -76,10 +76,7 @@ class LiquidGlass extends StatelessWidget {
                 ],
                 stops: const [0.0, 0.45, 1.0],
               ),
-              border: Border.all(
-                width: borderWidth,
-                color: edge,
-              ),
+              border: Border.all(width: borderWidth, color: edge),
             ),
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -88,7 +85,9 @@ class LiquidGlass extends StatelessWidget {
                   bottom: BorderSide(color: bottomEdge, width: 0.5),
                 ),
               ),
-              child: padding == null ? child : Padding(padding: padding!, child: child),
+              child: padding == null
+                  ? child
+                  : Padding(padding: padding!, child: child),
             ),
           ),
         ),
@@ -129,7 +128,9 @@ class LiquidGlassIconButton extends StatelessWidget {
             child: Icon(
               icon,
               size: iconSize,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimaryLight,
             ),
           ),
         ),

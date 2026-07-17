@@ -446,7 +446,9 @@ class _ProviderEditorSheetState extends ConsumerState<_ProviderEditorSheet> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: (_testing || _savingModel) ? null : _testConnection,
+                      onPressed: (_testing || _savingModel)
+                          ? null
+                          : _testConnection,
                       child: _testing
                           ? const SizedBox(
                               width: 18,
@@ -555,7 +557,8 @@ class _ProviderEditorSheetState extends ConsumerState<_ProviderEditorSheet> {
   }
 
   Future<void> _testConnection() async {
-    final models = _modelsPinned ??
+    final models =
+        _modelsPinned ??
         ref.read(llmModelsForProviderProvider(_id)).value ??
         const <LlmModel>[];
     if (models.isEmpty) {
@@ -567,9 +570,8 @@ class _ProviderEditorSheetState extends ConsumerState<_ProviderEditorSheet> {
         : _baseUrl.text.trim();
     var key = _apiKey.text.trim();
     if (key.isEmpty) {
-      key = (await ref
-                  .read(llmProviderRepositoryProvider)
-                  .getApiKey(_id))
+      key =
+          (await ref.read(llmProviderRepositoryProvider).getApiKey(_id))
               ?.trim() ??
           '';
     }
@@ -591,9 +593,7 @@ class _ProviderEditorSheetState extends ConsumerState<_ProviderEditorSheet> {
       // Bypass scheduler so a probe never blocks comment generation.
       final client = HttpLlmClient();
       final text = await client.complete(
-        const [
-          LlmMessage(role: 'user', content: '只回复两个字母：OK'),
-        ],
+        const [LlmMessage(role: 'user', content: '只回复两个字母：OK')],
         LlmRequestConfig(
           providerId: _id,
           protocol: _protocol,

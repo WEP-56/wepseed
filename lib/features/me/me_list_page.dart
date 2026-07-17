@@ -125,9 +125,8 @@ class MeListPage extends ConsumerWidget {
                 child: _ArticleRow(
                   title: a.title,
                   subtitle: a.source.name,
-                  onTap: () => context.push(
-                    '/article/${Uri.encodeComponent(a.id)}',
-                  ),
+                  onTap: () =>
+                      context.push('/article/${Uri.encodeComponent(a.id)}'),
                 ),
               );
             },
@@ -264,7 +263,10 @@ class _SwipeDelete extends StatelessWidget {
           color: const Color(0xFFE11D48).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFE11D48)),
+        child: const Icon(
+          Icons.delete_outline_rounded,
+          color: Color(0xFFE11D48),
+        ),
       ),
       confirmDismiss: (_) async {
         await onDelete();

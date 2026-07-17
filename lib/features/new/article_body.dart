@@ -25,14 +25,18 @@ class ArticleBody extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     // Dark mode: keep body near-white; avoid mid-grey that vanishes on #0A0A0A.
-    final textColor =
-        isDark ? const Color(0xFFF0F0F0) : AppColors.textPrimaryLight;
-    final secondary =
-        isDark ? const Color(0xFFC4C4C4) : AppColors.textSecondaryLight;
-    final muted =
-        isDark ? const Color(0xFF9A9A9A) : AppColors.textTertiaryLight;
-    final linkColor =
-        isDark ? const Color(0xFF7CB8F0) : const Color(0xFF2563EB);
+    final textColor = isDark
+        ? const Color(0xFFF0F0F0)
+        : AppColors.textPrimaryLight;
+    final secondary = isDark
+        ? const Color(0xFFC4C4C4)
+        : AppColors.textSecondaryLight;
+    final muted = isDark
+        ? const Color(0xFF9A9A9A)
+        : AppColors.textTertiaryLight;
+    final linkColor = isDark
+        ? const Color(0xFF7CB8F0)
+        : const Color(0xFF2563EB);
 
     if (article.hasHtmlBody) {
       var html = sanitizeArticleHtml(article.contentHtml!);
@@ -69,10 +73,7 @@ class ArticleBody extends StatelessWidget {
                       height: 80,
                       alignment: Alignment.center,
                       color: isDark ? AppColors.inkSoft : AppColors.wash,
-                      child: Icon(
-                        Icons.broken_image_outlined,
-                        color: muted,
-                      ),
+                      child: Icon(Icons.broken_image_outlined, color: muted),
                     ),
                   ),
                 ),
@@ -92,23 +93,23 @@ class ArticleBody extends StatelessWidget {
                 };
                 final style = switch (level) {
                   1 => theme.textTheme.headlineSmall?.copyWith(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                      color: textColor,
-                    ),
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                    color: textColor,
+                  ),
                   3 => theme.textTheme.titleMedium?.copyWith(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      height: 1.35,
-                      color: textColor,
-                    ),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                    color: textColor,
+                  ),
                   _ => theme.textTheme.titleLarge?.copyWith(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w700,
-                      height: 1.32,
-                      color: textColor,
-                    ),
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    height: 1.32,
+                    color: textColor,
+                  ),
                 };
                 final title = idx != null && idx >= 0 && idx < tocEntries.length
                     ? tocEntries[idx].label
@@ -141,10 +142,7 @@ class ArticleBody extends StatelessWidget {
             color: textColor,
             fontFamily: theme.textTheme.bodyLarge?.fontFamily,
           ),
-          'p': Style(
-            margin: Margins.only(bottom: 14),
-            color: textColor,
-          ),
+          'p': Style(margin: Margins.only(bottom: 14), color: textColor),
           'div': Style(color: textColor),
           'span': Style(color: textColor),
           'h1': Style(

@@ -32,7 +32,10 @@ String sanitizeLlmCommentText(String raw) {
 
   // Orphan close tags alone (models sometimes only emit closing).
   text = text.replaceAll(
-    RegExp(r'</\s*(think|thinking|reasoning|reflection)\s*>', caseSensitive: false),
+    RegExp(
+      r'</\s*(think|thinking|reasoning|reflection)\s*>',
+      caseSensitive: false,
+    ),
     '',
   );
 
@@ -174,9 +177,7 @@ bool _looksLikeThinkingOnly(String text) {
   final lower = t.toLowerCase();
 
   // Classic planning openers seen in agentic models (screenshot cases).
-  if (RegExp(
-    r'^(先快速|先把|先核对|先看|先读|先理|先摸|确保|我先|让我|首先|接下来我|开始分析)',
-  ).hasMatch(t)) {
+  if (RegExp(r'^(先快速|先把|先核对|先看|先读|先理|先摸|确保|我先|让我|首先|接下来我|开始分析)').hasMatch(t)) {
     // Allow if it also reads like a real short take with substance.
     final hasOpinion =
         t.length >= 40 &&

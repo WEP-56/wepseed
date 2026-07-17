@@ -16,11 +16,13 @@ class SettingsRepositoryImpl implements SettingsRepository {
   final AppDatabase _db;
 
   Future<void> ensureDefaults() async {
-    final settings = await (_db.select(_db.appSettingsRows)
-          ..where((t) => t.id.equals(_defaultRowId)))
-        .getSingleOrNull();
+    final settings = await (_db.select(
+      _db.appSettingsRows,
+    )..where((t) => t.id.equals(_defaultRowId))).getSingleOrNull();
     if (settings == null) {
-      await _db.into(_db.appSettingsRows).insert(
+      await _db
+          .into(_db.appSettingsRows)
+          .insert(
             AppSettingsRowsCompanion.insert(
               id: _defaultRowId,
               updatedAt: DateTime.now(),
@@ -28,11 +30,13 @@ class SettingsRepositoryImpl implements SettingsRepository {
           );
     }
 
-    final user = await (_db.select(_db.userProfiles)
-          ..where((t) => t.id.equals(_defaultRowId)))
-        .getSingleOrNull();
+    final user = await (_db.select(
+      _db.userProfiles,
+    )..where((t) => t.id.equals(_defaultRowId))).getSingleOrNull();
     if (user == null) {
-      await _db.into(_db.userProfiles).insert(
+      await _db
+          .into(_db.userProfiles)
+          .insert(
             UserProfilesCompanion.insert(
               id: _defaultRowId,
               displayName: MockData.defaultUser.displayName,
@@ -54,18 +58,18 @@ class SettingsRepositoryImpl implements SettingsRepository {
   @override
   Future<AppSettings> get() async {
     await ensureDefaults();
-    final row = await (_db.select(_db.appSettingsRows)
-          ..where((t) => t.id.equals(_defaultRowId)))
-        .getSingle();
+    final row = await (_db.select(
+      _db.appSettingsRows,
+    )..where((t) => t.id.equals(_defaultRowId))).getSingle();
     return _mapSettings(row);
   }
 
   @override
   Future<void> save(AppSettings settings) async {
     await ensureDefaults();
-    await (_db.update(_db.appSettingsRows)
-          ..where((t) => t.id.equals(_defaultRowId)))
-        .write(
+    await (_db.update(
+      _db.appSettingsRows,
+    )..where((t) => t.id.equals(_defaultRowId))).write(
       AppSettingsRowsCompanion(
         themeMode: Value(_themeModeToString(settings.themeMode)),
         fontScale: Value(settings.fontScale),
@@ -92,18 +96,18 @@ class SettingsRepositoryImpl implements SettingsRepository {
   @override
   Future<UserProfile> getUser() async {
     await ensureDefaults();
-    final row = await (_db.select(_db.userProfiles)
-          ..where((t) => t.id.equals(_defaultRowId)))
-        .getSingle();
+    final row = await (_db.select(
+      _db.userProfiles,
+    )..where((t) => t.id.equals(_defaultRowId))).getSingle();
     return UserProfile(displayName: row.displayName);
   }
 
   @override
   Future<void> saveUser(UserProfile user) async {
     await ensureDefaults();
-    await (_db.update(_db.userProfiles)
-          ..where((t) => t.id.equals(_defaultRowId)))
-        .write(
+    await (_db.update(
+      _db.userProfiles,
+    )..where((t) => t.id.equals(_defaultRowId))).write(
       UserProfilesCompanion(
         displayName: Value(user.displayName),
         updatedAt: Value(DateTime.now()),
@@ -125,16 +129,16 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   static String _themeModeToString(ThemeMode mode) => switch (mode) {
-        ThemeMode.light => 'light',
-        ThemeMode.dark => 'dark',
-        ThemeMode.system => 'system',
-      };
+    ThemeMode.light => 'light',
+    ThemeMode.dark => 'dark',
+    ThemeMode.system => 'system',
+  };
 
   static ThemeMode _themeModeFromString(String value) => switch (value) {
-        'light' => ThemeMode.light,
-        'dark' => ThemeMode.dark,
-        _ => ThemeMode.system,
-      };
+    'light' => ThemeMode.light,
+    'dark' => ThemeMode.dark,
+    _ => ThemeMode.system,
+  };
 }
 
 String feedFilterToDb(FeedFilter filter) {

@@ -79,7 +79,8 @@ String normalizeVersionTag(String tag) {
 }
 
 class GithubUpdateService {
-  GithubUpdateService({http.Client? client}) : _client = client ?? http.Client();
+  GithubUpdateService({http.Client? client})
+    : _client = client ?? http.Client();
 
   final http.Client _client;
 
@@ -151,7 +152,9 @@ class GithubUpdateService {
   }) async {
     final req = http.Request('GET', Uri.parse(asset.downloadUrl));
     req.headers['User-Agent'] = 'wepseed-android';
-    final streamed = await _client.send(req).timeout(const Duration(minutes: 10));
+    final streamed = await _client
+        .send(req)
+        .timeout(const Duration(minutes: 10));
     if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
       throw StateError('下载失败（HTTP ${streamed.statusCode}）');
     }

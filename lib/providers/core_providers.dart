@@ -6,6 +6,8 @@ import '../data/llm/http_llm_client.dart';
 import '../data/llm/scheduled_llm_client.dart';
 import '../data/llm/llm_client.dart';
 import '../data/repositories/article_repository.dart';
+import '../data/repositories/comment_job_repository.dart';
+import '../data/repositories/comment_job_repository_impl.dart';
 import '../data/repositories/comment_repository.dart';
 import '../data/repositories/comment_repository_impl.dart';
 import '../data/repositories/drift_article_repository.dart';
@@ -84,9 +86,18 @@ final articleRepositoryProvider = Provider<ArticleRepository>((ref) {
   return repo;
 });
 
+final commentJobRepositoryProvider = Provider<CommentJobRepository>((ref) {
+  return CommentJobRepositoryImpl(ref.watch(databaseProvider));
+});
+
 final commentRepositoryProvider = Provider<CommentRepository>((ref) {
   final warm = ref.watch(warmEventRepositoryProvider);
-  return CommentRepositoryImpl(ref.watch(databaseProvider), warmEvents: warm);
+  final jobs = ref.watch(commentJobRepositoryProvider);
+  return CommentRepositoryImpl(
+    ref.watch(databaseProvider),
+    warmEvents: warm,
+    jobs: jobs,
+  );
 });
 
 /// Phase D real LLM HTTP client.

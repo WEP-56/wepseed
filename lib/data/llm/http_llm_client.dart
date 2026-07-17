@@ -285,9 +285,7 @@ class HttpLlmClient implements LlmClient {
         if (attempt >= _maxAttempts - 1) throw lastError;
       }
     }
-    throw lastError is LlmException
-        ? lastError
-        : LlmException('请求失败');
+    throw lastError is LlmException ? lastError : LlmException('请求失败');
   }
 
   /// JSON APIs are UTF-8 by specification, but many compatible gateways omit
