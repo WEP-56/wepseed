@@ -16,6 +16,8 @@ import '../data/repositories/drift_warm_event_repository.dart';
 import '../data/repositories/feed_repository.dart';
 import '../data/repositories/llm_provider_repository.dart';
 import '../data/repositories/llm_provider_repository_impl.dart';
+import '../data/repositories/media_chat_repository.dart';
+import '../data/repositories/media_chat_repository_impl.dart';
 import '../data/repositories/mock_article_repository.dart';
 import '../data/repositories/mock_feed_repository.dart';
 import '../data/repositories/mock_warm_event_repository.dart';
@@ -98,6 +100,10 @@ final commentRepositoryProvider = Provider<CommentRepository>((ref) {
     warmEvents: warm,
     jobs: jobs,
   );
+});
+
+final mediaChatRepositoryProvider = Provider<MediaChatRepository>((ref) {
+  return MediaChatRepositoryImpl(ref.watch(databaseProvider));
 });
 
 /// Phase D real LLM HTTP client.

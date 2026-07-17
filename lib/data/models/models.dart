@@ -10,6 +10,8 @@ enum CommentAuthorType { user, netizen }
 
 enum ArticleMediaType { blog, audio, video }
 
+enum MediaChatMessageStatus { pending, completed, failed }
+
 class FeedSource {
   const FeedSource({
     required this.id,
@@ -91,6 +93,39 @@ class Article {
     return true;
   }
 }
+
+class MediaChatMessage {
+  const MediaChatMessage({
+    required this.id,
+    required this.articleId,
+    required this.role,
+    required this.content,
+    required this.status,
+    required this.createdAt,
+    required this.updatedAt,
+    this.error,
+  });
+
+  final String id;
+  final String articleId;
+  final String role;
+  final String content;
+  final MediaChatMessageStatus status;
+  final String? error;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  bool get isUser => role == 'user';
+}
+
+String mediaChatMessageStatusToDb(MediaChatMessageStatus value) => value.name;
+
+MediaChatMessageStatus mediaChatMessageStatusFromDb(String value) =>
+    switch (value) {
+      'pending' => MediaChatMessageStatus.pending,
+      'failed' => MediaChatMessageStatus.failed,
+      _ => MediaChatMessageStatus.completed,
+    };
 
 String articleMediaTypeToDb(ArticleMediaType type) => type.name;
 

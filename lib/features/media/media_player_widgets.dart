@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/ui/app_toast.dart';
 import '../../data/models/models.dart';
 import '../../providers/media_session_provider.dart';
 import '../../widgets/app_network_image.dart';
@@ -218,33 +219,64 @@ class _VideoSurface extends ConsumerWidget {
                   ),
                 ),
               ),
-              Center(
-                child: _PrimaryPlayButton(
-                  loading: active && session.loading,
-                  playing: active && session.playing,
-                  light: true,
-                  onTap: () async {
-                    final media = ref.read(mediaSessionProvider.notifier);
-                    if (active) {
-                      await media.toggle();
-                    } else {
-                      await media.open(article);
-                    }
-                  },
+              if (!active || !session.playing)
+                Center(
+                  child: _PrimaryPlayButton(
+                    loading: active && session.loading,
+                    playing: false,
+                    light: true,
+                    onTap: () async {
+                      final media = ref.read(mediaSessionProvider.notifier);
+                      if (active) {
+                        await media.play();
+                      } else {
+                        await media.open(article);
+                      }
+                    },
+                  ),
                 ),
-              ),
               if (initialized)
                 Positioned(
                   right: 10,
                   bottom: 10,
-                  child: IconButton.filledTonal(
-                    tooltip: '全屏',
-                    onPressed: () => _openFullscreen(context, ref),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.black.withValues(alpha: 0.38),
-                      foregroundColor: Colors.white,
-                    ),
-                    icon: const Icon(Icons.fullscreen_rounded),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _VideoActionButton(
+                        tooltip: session.playing ? '暂停' : '播放',
+                        icon: session.playing
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        onPressed: () =>
+                            ref.read(mediaSessionProvider.notifier).toggle(),
+                      ),
+                      const SizedBox(width: 6),
+                      _VideoActionButton(
+                        tooltip: '小窗播放',
+                        icon: Icons.picture_in_picture_alt_rounded,
+                        onPressed: () async {
+                          final ok = await ref
+                              .read(mediaSessionProvider.notifier)
+                              .enterVideoPip();
+                          if (!ok && context.mounted) {
+                            showAppToast('此设备当前不支持小窗播放', context: context);
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 6),
+                      _VideoActionButton(
+                        tooltip: '全屏',
+                        icon: Icons.fullscreen_rounded,
+                        onPressed: () => _openFullscreen(context, ref),
+                      ),
+                      const SizedBox(width: 6),
+                      _VideoActionButton(
+                        tooltip: '关闭播放器',
+                        icon: Icons.close_rounded,
+                        onPressed: () =>
+                            ref.read(mediaSessionProvider.notifier).stop(),
+                      ),
+                    ],
                   ),
                 ),
               if (!article.hasPlayableMedia ||
@@ -271,6 +303,56 @@ class _VideoSurface extends ConsumerWidget {
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => const _FullscreenVideoPage(),
+      ),
+    );
+  }
+}
+
+class _VideoActionButton extends StatelessWidget {
+  const _VideoActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.filledTonal(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.black.withValues(alpha: 0.42),
+        foregroundColor: Colors.white,
+        minimumSize: const Size(36, 36),
+        padding: EdgeInsets.zero,
+      ),
+      icon: Icon(icon, size: 19),
+    );
+  }
+}
+
+/// The complete Flutter page is replaced by this widget while Android shows
+/// the activity in PiP mode, leaving only the active video surface visible.
+class PipVideoSurface extends ConsumerWidget {
+  const PipVideoSurface({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(mediaSessionProvider.notifier).videoController;
+    if (controller?.value.isInitialized != true) {
+      return const ColoredBox(color: Colors.black);
+    }
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: controller!.value.aspectRatio,
+          child: VideoPlayer(controller),
+        ),
       ),
     );
   }

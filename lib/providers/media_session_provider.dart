@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:floating/floating.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:video_player/video_player.dart';
@@ -61,6 +62,7 @@ class MediaSessionState {
 
 class MediaSessionController extends Notifier<MediaSessionState> {
   final AudioPlayer _audio = AudioPlayer();
+  final Floating _floating = Floating();
   VideoPlayerController? _video;
   final _subscriptions = <StreamSubscription<dynamic>>[];
 
@@ -174,6 +176,7 @@ class MediaSessionController extends Notifier<MediaSessionState> {
       clearError: true,
     );
     if (autoplay) await controller.play();
+    if (autoplay) unawaited(_prepareVideoPip());
   }
 
   void _syncVideoState() {
@@ -194,6 +197,7 @@ class MediaSessionController extends Notifier<MediaSessionState> {
       await _audio.play();
     } else {
       await _video?.play();
+      unawaited(_prepareVideoPip());
     }
   }
 
@@ -202,6 +206,7 @@ class MediaSessionController extends Notifier<MediaSessionState> {
       await _audio.pause();
     } else {
       await _video?.pause();
+      await _floating.cancelOnLeavePiP();
     }
   }
 
@@ -230,6 +235,7 @@ class MediaSessionController extends Notifier<MediaSessionState> {
 
   Future<void> stop() async {
     await _audio.stop();
+    await _floating.cancelOnLeavePiP();
     await _disposeVideo();
     state = const MediaSessionState();
   }
@@ -240,5 +246,27 @@ class MediaSessionController extends Notifier<MediaSessionState> {
     if (video == null) return;
     video.removeListener(_syncVideoState);
     await video.dispose();
+  }
+
+  Future<void> _prepareVideoPip() async {
+    if (!state.isVideo || _video?.value.isInitialized != true) return;
+    try {
+      if (await _floating.isPipAvailable) {
+        await _floating.enable(OnLeavePiP());
+      }
+    } catch (_) {
+      // PiP is a device capability. Playback continues normally if unavailable.
+    }
+  }
+
+  Future<bool> enterVideoPip() async {
+    if (!state.isVideo || _video?.value.isInitialized != true) return false;
+    try {
+      if (!await _floating.isPipAvailable) return false;
+      await _floating.enable(ImmediatePiP());
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 }

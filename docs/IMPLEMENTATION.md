@@ -1,8 +1,8 @@
 # WEPSEED 功能实现文档
 
-> 版本：**0.0.5**（tag `v0.0.5` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
+> 版本：**0.0.6**（tag `v0.0.6` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
 > 平台：Flutter · Android 首发 · 本地优先（local-only）  
-> 状态：**0.0.5 代码完成，待真机安装验收**；包含 D-task + 音视频播放器 + 媒体专属 LLM 对话窗  
+> 状态：**0.0.6 代码完成，待真机安装验收**；修复视频后台 PiP 与媒体 LLM 对话持久化  
 > 开关：`kUseMockFeed` / `kUseMockComments`（`lib/core/config/app_flags.dart`）
 
 本文档只写**要做什么、做成什么样、怎么落地**。  
@@ -30,7 +30,7 @@
 | 订阅 | 添加源、OPML 导入/导出、刷新 | **已接真**（Set + 源页） |
 | 刷 | New masonry 流 + 源主页 | **真 Stream + 下拉刷新**（时间轨已移除；**筛选已接**） |
 | 读 | 详情正文、已读、收藏 | **HTML 正文 + 图缓存 + 目录 scrubber**；外链系统浏览器 |
-| 播 | RSS 音频 / 视频 | **文章级媒体识别 + 沉浸详情播放器 + 全局 mini + 音频后台通知 + 视频全屏** |
+| 播 | RSS 音频 / 视频 | **文章级媒体识别 + 沉浸详情播放器 + 全局 mini + 音频后台通知 + 视频全屏 / Android PiP** |
 | 评 | TikTok 式评论区 + 多网友 | **真 LLM**；无 Key 不灌 mock；**去 think/tool 清洗**（0.0.4 真机通过）；**D-task 已接**（`comment_jobs` + one-off WM，待真机） |
 | 回看 | ME 时间轴 | **Drift**；三 stat → 列表 CRUD（收藏/对话/痕迹，0.0.4 真机通过） |
 | 设 | 形象、主题、字号、多提供商/网友、DATA、关于 | **大部分真持久化**；关于 = 真版本 + GitHub 更新/协议 |
@@ -84,7 +84,7 @@ test/
 | 多网友 CRUD | Drift |
 | 评论区 | 真 LLM；clearAll；重试；**sanitize 去 think/tool**（**0.0.4 真机通过**） |
 | New / 源 / 详情 | 真流 + 筛选 + HTML + scrubber + dwell |
-| 媒体 | RSS/Atom 音视频识别；音频后台/通知/倍速；视频全屏；全局 mini；媒体专属 LLM 对话窗 |
+| 媒体 | RSS/Atom 音视频识别；音频后台/通知/倍速；视频全屏 / Android PiP；全局 mini；**持久**媒体 LLM 对话窗 |
 | 通知深链 | **`push`**；返回栈 **真机通过** |
 | ME | 时间轴 + **收藏/对话/痕迹列表 CRUD**（**0.0.4 真机通过**） |
 | Set · RSS / 关于 / DATA | 订阅 OPML；更新安装；**后台被杀？** 提示 |
@@ -97,7 +97,7 @@ test/
 
 | 优先级 | 项 |
 |--------|-----|
-| 中 | **0.0.5 真机验收**：D-task 杀进程恢复；音频后台/通知；视频全屏；媒体 AI 对话 |
+| 中 | **0.0.6 真机验收**：视频回桌面 PiP / 手动小窗；媒体 AI 关闭与生成中续接 |
 | 低 | 媒体 M3：进度持久化、下载缓存、视频 PiP |
 | 中 | E-ROM 长期：极端省电/多 ROM 文档与验收可继续补 |
 | 低 | 评论流式气泡；应用内 WebView（§15.6） |
@@ -139,7 +139,7 @@ test/
 | F-comment-think | 评论展示思考过程 / toolcall | **关闭**（`sanitizeLlmCommentText`；**0.0.4 真机通过**） |
 | F-me-lists | ME 收藏/对话/痕迹不可点 | **关闭**（列表 CRUD；**0.0.4 真机通过**） |
 | **D-task** | 评论生成杀进程丢任务 | **代码已接**（schema 5 + one-off WM）；**待真机验收** |
-| **P1-media** | 音视频播放器与媒体 AI 对话 | **代码已接**（schema 6）；**待真机验收** |
+| **P1-media** | 视频后台 PiP / 媒体 AI 持久化 | **代码已接**（schema 7）；**待真机验收** |
 | E-ROM | 厂商杀后台 | Set 有提示；**0.0.4 综合测无问题**；极端 ROM 长期可续 |
 
 **RSS 后台（杀进程仍通知）— 已加固 + 0.0.4 测过：**
@@ -931,29 +931,29 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.1 一句话
 
-**`v0.0.5` 已完成并进入真机验收：D-task 杀进程恢复 + schema 6 媒体字段 + 音视频播放器 + 全局 mini + 媒体专属 LLM 对话窗。**
+**`v0.0.6` 已完成并进入真机验收：视频 Android PiP + schema 7 媒体对话持久化；关闭或重开对话不丢消息，待回复自动续接。**
 
 ### 15.2 现状速查
 
 | 模块 | 路径 / 要点 |
 |------|-------------|
-| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.5`** |
+| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.6`** |
 | Flag | `kUseMockFeed=false`；`kUseMockComments=false` |
-| 版本 | `pubspec` `0.0.5+5` |
-| Drift | **schemaVersion = 6**；评论任务表 + articles 媒体字段 |
+| 版本 | `pubspec` `0.0.6+6` |
+| Drift | **schemaVersion = 7**；评论任务表 + articles 媒体字段 + media_chat_messages |
 | 评论清洗 | `lib/data/llm/llm_text_sanitize.dart` · complete 后 + 入库前 |
 | 评论任务 | `lib/data/comments/comment_generation_engine.dart` · `comment_job_repository*` · `comment_job_worker.dart` |
 | ME 列表 | `/me/bookmarks` · `/me/chats` · `/me/traces` · `me_list_page.dart` |
 | RSS 后台 | `scheduleFromDatabase` · `runRssRefreshJob` · `DartPluginRegistrant` |
 | 评论 WM | one-off `wepseed.drain-comment-jobs`（≠ RSS） |
 | 媒体 | `features/media/` · `mediaSessionProvider` · just_audio/audio_service · video_player |
-| 媒体 AI | 仅音视频详情「一起聊」；默认模型；内存会话；不写网友评论任务 |
+| 媒体 AI | 仅音视频详情「一起聊」；默认模型；**Drift 持久会话 / 待回复续接**；不写网友评论任务 |
 | 通知 | channel `rss_updates`；深链 **`push` only** |
 | 债表 | **§1.5** |
 
 ### 15.3 下一会话建议顺序
 
-1. **0.0.5 真机**：D-task 生成中强制停止；音频后台/通知/倍速；视频全屏；mini；媒体 AI 对话  
+1. **0.0.6 真机**：视频点小窗 / 回桌面 PiP；媒体 AI 关闭、重开、生成中续接  
 2. 根据真机反馈修复播放器格式兼容、系统栏与 OEM 后台行为  
 3. 后续：媒体 M3（进度持久化/PiP/下载）或 WebView（§15.6）
 
@@ -977,8 +977,8 @@ flutter pub get
 flutter analyze
 flutter test
 flutter run -d <device>
-# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.5
-# 首选 wepseed-0.0.5-arm64-v8a.apk
+# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.6
+# 首选 wepseed-0.0.6-arm64-v8a.apk
 ```
 
 ### 15.6 Backlog：应用内 WebView 阅读器（Phase F 余）
@@ -1031,8 +1031,9 @@ flutter run -d <device>
 | **0.0.2** | 双击退出；Toast；关于更新；LLM 重试·测连；Maven 官方优先 |
 | **0.0.3** | 通知 `push`；New 筛选 schema 4；**真机通过** |
 | **0.0.4** | 评论 sanitize；ME 列表 CRUD；RSS WM 加固；**真机综合测通过** |
-| **0.0.5** | D-task；schema 6 媒体识别；音频/视频/全局 mini；音频系统媒体会话；媒体 AI 对话窗；待真机反馈 |
-| **未收口** | 0.0.5 真机；媒体 M3；流式/WebView；E-ROM 可选 |
+| **0.0.5** | D-task；schema 6 媒体识别；音频/视频/全局 mini；音频系统媒体会话；媒体 AI 对话窗 |
+| **0.0.6** | Android 视频 PiP（手动 / 回桌面自动）；schema 7 媒体 LLM 对话持久化与待回复续接；待真机反馈 |
+| **未收口** | 0.0.6 真机；媒体 M3（进度/下载）；流式/WebView；E-ROM 可选 |
 
 ### 15.9 会话记录
 

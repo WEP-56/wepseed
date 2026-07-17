@@ -4,11 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../data/llm/llm_client.dart';
-import '../../data/llm/llm_resolve.dart';
-import '../../data/llm/llm_text_sanitize.dart';
 import '../../data/models/models.dart';
-import '../../providers/core_providers.dart';
+import '../../providers/media_chat_providers.dart';
 import '../../widgets/liquid_glass.dart';
 
 Future<void> showMediaLlmChat(BuildContext context, Article article) {
@@ -51,14 +48,14 @@ class _MediaLlmChat extends ConsumerStatefulWidget {
 class _MediaLlmChatState extends ConsumerState<_MediaLlmChat> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
-  final _messages = <_ChatEntry>[
-    const _ChatEntry(
-      role: 'assistant',
-      content: '可以和我聊这期内容。我的上下文来自标题与节目说明，不会假装听过或看过未提供的部分。',
-    ),
-  ];
-  bool _sending = false;
-  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(ref.read(mediaChatControllerProvider).resume(widget.article));
+    });
+  }
 
   @override
   void dispose() {
@@ -67,48 +64,12 @@ class _MediaLlmChatState extends ConsumerState<_MediaLlmChat> {
     super.dispose();
   }
 
-  Future<void> _send() async {
+  Future<void> _send(bool busy) async {
     final text = _input.text.trim();
-    if (text.isEmpty || _sending) return;
+    if (text.isEmpty || busy) return;
     _input.clear();
-    setState(() {
-      _sending = true;
-      _error = null;
-      _messages.add(_ChatEntry(role: 'user', content: text));
-    });
+    await ref.read(mediaChatControllerProvider).send(widget.article, text);
     _scrollToEnd();
-
-    try {
-      final repo = ref.read(llmProviderRepositoryProvider);
-      final config = await resolveDefaultLlmConfig(
-        llmRepo: repo,
-        providers: await repo.getProviders(),
-        allModels: await repo.getAllModels(),
-      );
-      if (config == null) {
-        throw LlmException('请先在设置中配置可用的默认模型与 API Key');
-      }
-      final response = await ref
-          .read(llmClientProvider)
-          .complete(
-            _requestMessages(widget.article, _messages),
-            config.copyWith(),
-          );
-      final clean = sanitizeLlmCommentText(response);
-      if (clean.isEmpty) throw LlmException('模型没有返回可显示的内容');
-      if (!mounted) return;
-      setState(
-        () => _messages.add(_ChatEntry(role: 'assistant', content: clean)),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _error = error.toString());
-    } finally {
-      if (mounted) {
-        setState(() => _sending = false);
-        _scrollToEnd();
-      }
-    }
   }
 
   void _scrollToEnd() {
@@ -126,8 +87,19 @@ class _MediaLlmChatState extends ConsumerState<_MediaLlmChat> {
 
   @override
   Widget build(BuildContext context) {
+    final messagesAsync = ref.watch(
+      mediaChatMessagesProvider(widget.article.id),
+    );
+    final messages = messagesAsync.value ?? const <MediaChatMessage>[];
+    final busy = messages.any(
+      (message) => message.status == MediaChatMessageStatus.pending,
+    );
     final media = MediaQuery.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    ref.listen(mediaChatMessagesProvider(widget.article.id), (previous, next) {
+      _scrollToEnd();
+    });
+
     return SafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
@@ -151,55 +123,7 @@ class _MediaLlmChatState extends ConsumerState<_MediaLlmChat> {
                 opacity: isDark ? 0.12 : 0.78,
                 child: Column(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 15, 8, 11),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isDark ? Colors.white : Colors.black,
-                            ),
-                            child: Icon(
-                              Icons.auto_awesome_rounded,
-                              size: 17,
-                              color: isDark ? Colors.black : Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '一起聊',
-                                  style: Theme.of(context).textTheme.titleSmall
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                                Text(
-                                  widget.article.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        color: isDark
-                                            ? AppColors.textTertiaryDark
-                                            : AppColors.textTertiaryLight,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: '关闭',
-                            onPressed: Navigator.of(context).pop,
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _Header(article: widget.article),
                     Divider(
                       height: 1,
                       color: isDark
@@ -207,30 +131,27 @@ class _MediaLlmChatState extends ConsumerState<_MediaLlmChat> {
                           : AppColors.dividerLight,
                     ),
                     Expanded(
-                      child: ListView.separated(
-                        controller: _scroll,
-                        padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
-                        itemCount: _messages.length + (_sending ? 1 : 0),
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          if (index == _messages.length) {
-                            return const _ThinkingBubble();
-                          }
-                          return _MessageBubble(entry: _messages[index]);
-                        },
-                      ),
-                    ),
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                        child: Text(
-                          _error!,
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.error,
+                      child: messagesAsync.isLoading && messages.isEmpty
+                          ? const Center(child: CircularProgressIndicator())
+                          : ListView.separated(
+                              controller: _scroll,
+                              padding: const EdgeInsets.fromLTRB(
+                                14,
+                                16,
+                                14,
+                                12,
                               ),
-                        ),
-                      ),
+                              itemCount: messages.isEmpty ? 1 : messages.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (context, index) {
+                                if (messages.isEmpty) {
+                                  return const _WelcomeBubble();
+                                }
+                                return _MessageBubble(entry: messages[index]);
+                              },
+                            ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 7, 8, 10),
                       child: Row(
@@ -242,9 +163,9 @@ class _MediaLlmChatState extends ConsumerState<_MediaLlmChat> {
                               minLines: 1,
                               maxLines: 4,
                               textInputAction: TextInputAction.send,
-                              onSubmitted: (_) => _send(),
+                              onSubmitted: (_) => _send(busy),
                               decoration: InputDecoration(
-                                hintText: '问问这期内容…',
+                                hintText: busy ? '正在生成回复…' : '问问这期内容…',
                                 filled: true,
                                 fillColor:
                                     (isDark ? Colors.white : Colors.black)
@@ -263,7 +184,7 @@ class _MediaLlmChatState extends ConsumerState<_MediaLlmChat> {
                           const SizedBox(width: 7),
                           IconButton.filled(
                             tooltip: '发送',
-                            onPressed: _sending ? null : _send,
+                            onPressed: busy ? null : () => _send(busy),
                             style: IconButton.styleFrom(
                               backgroundColor: isDark
                                   ? Colors.white
@@ -272,7 +193,14 @@ class _MediaLlmChatState extends ConsumerState<_MediaLlmChat> {
                                   ? Colors.black
                                   : Colors.white,
                             ),
-                            icon: const Icon(Icons.arrow_upward_rounded),
+                            icon: busy
+                                ? const SizedBox.square(
+                                    dimension: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.arrow_upward_rounded),
                           ),
                         ],
                       ),
@@ -288,36 +216,112 @@ class _MediaLlmChatState extends ConsumerState<_MediaLlmChat> {
   }
 }
 
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.entry});
+class _Header extends StatelessWidget {
+  const _Header({required this.article});
 
-  final _ChatEntry entry;
+  final Article article;
 
   @override
   Widget build(BuildContext context) {
-    final user = entry.role == 'user';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 15, 8, 11),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDark ? Colors.white : Colors.black,
+            ),
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              size: 17,
+              color: isDark ? Colors.black : Colors.white,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '一起聊',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  article.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: isDark
+                        ? AppColors.textTertiaryDark
+                        : AppColors.textTertiaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: '关闭',
+            onPressed: Navigator.of(context).pop,
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WelcomeBubble extends StatelessWidget {
+  const _WelcomeBubble();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _StaticBubble(
+      text: '可以和我聊这期内容。我的上下文来自标题与节目说明，不会假装听过或看过未提供的部分。',
+    );
+  }
+}
+
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({required this.entry});
+
+  final MediaChatMessage entry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entry.status == MediaChatMessageStatus.pending) {
+      return const _StaticBubble(text: '正在生成回复…', loading: true);
+    }
+    if (entry.status == MediaChatMessageStatus.failed) {
+      return _StaticBubble(text: entry.error ?? '生成失败，请重新发送问题', error: true);
+    }
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Align(
-      alignment: user ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: entry.isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: const BoxConstraints(maxWidth: 480),
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
         decoration: BoxDecoration(
-          color: user
+          color: entry.isUser
               ? (isDark ? Colors.white : Colors.black)
               : (isDark ? AppColors.inkSoft : AppColors.wash),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(user ? 16 : 5),
-            bottomRight: Radius.circular(user ? 5 : 16),
+            bottomLeft: Radius.circular(entry.isUser ? 16 : 5),
+            bottomRight: Radius.circular(entry.isUser ? 5 : 16),
           ),
         ),
         child: Text(
           entry.content,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             height: 1.48,
-            color: user ? (isDark ? Colors.black : Colors.white) : null,
+            color: entry.isUser ? (isDark ? Colors.black : Colors.white) : null,
           ),
         ),
       ),
@@ -325,56 +329,52 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-class _ThinkingBubble extends StatelessWidget {
-  const _ThinkingBubble();
+class _StaticBubble extends StatelessWidget {
+  const _StaticBubble({
+    required this.text,
+    this.loading = false,
+    this.error = false,
+  });
+
+  final String text;
+  final bool loading;
+  final bool error;
 
   @override
   Widget build(BuildContext context) {
-    return const Align(
+    return Align(
       alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: SizedBox.square(
-          dimension: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.inkSoft
+              : AppColors.wash,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (loading) ...[
+              const SizedBox.square(
+                dimension: 15,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Text(
+                text,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.48,
+                  color: error ? Theme.of(context).colorScheme.error : null,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
-}
-
-class _ChatEntry {
-  const _ChatEntry({required this.role, required this.content});
-
-  final String role;
-  final String content;
-}
-
-List<LlmMessage> _requestMessages(Article article, List<_ChatEntry> history) {
-  final raw = article.body.trim().isNotEmpty ? article.body : article.summary;
-  final excerpt = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
-  final clipped = excerpt.length > 5000
-      ? '${excerpt.substring(0, 5000)}…'
-      : excerpt;
-  return [
-    LlmMessage(
-      role: 'system',
-      content:
-          '''
-你是 WEPSEED 音视频内容旁边的简洁对话助手。围绕用户正在播放的内容交流，回答自然、克制、直接。
-你只能看到订阅源提供的标题、摘要和节目说明，看不到也听不到媒体流本身。信息不足时明确说明，不得假装已经观看或收听。
-不要输出思考过程、工具调用或元话术。默认使用中文。
-
-类型：${article.mediaType == ArticleMediaType.audio ? '音频' : '视频'}
-来源：${article.source.name}
-标题：${article.title}
-节目说明：${clipped.isEmpty ? '（订阅源未提供）' : clipped}
-'''
-              .trim(),
-    ),
-    ...history
-        .skip(1)
-        .take(12)
-        .map((entry) => LlmMessage(role: entry.role, content: entry.content)),
-  ];
 }

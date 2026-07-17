@@ -86,6 +86,26 @@ class ChatMessages extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+/// Durable, article-scoped LLM conversation for audio/video detail pages.
+@DataClassName('MediaChatMessageRow')
+class MediaChatMessages extends Table {
+  TextColumn get id => text()();
+  TextColumn get articleId => text()();
+
+  /// user | assistant
+  TextColumn get role => text()();
+  TextColumn get content => text().withDefault(const Constant(''))();
+
+  /// pending | completed | failed
+  TextColumn get status => text().withDefault(const Constant('completed'))();
+  TextColumn get error => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 @DataClassName('CompanionRow')
 class Companions extends Table {
   TextColumn get id => text()();

@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:floating/floating.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/background/background_refresh_service.dart';
@@ -11,6 +13,7 @@ import 'core/ui/app_toast.dart';
 import 'data/models/models.dart';
 import 'providers/comment_providers.dart';
 import 'providers/settings_provider.dart';
+import 'features/media/media_player_widgets.dart';
 import 'router/app_router.dart';
 
 /// 通知 / Toast 深链：push 到现有栈上，避免 go 清栈后返回直接回桌面。
@@ -103,11 +106,17 @@ class _WepseedAppState extends ConsumerState<WepseedApp> {
       routerConfig: router,
       builder: (context, child) {
         final media = MediaQuery.of(context);
+        final content = child ?? const SizedBox.shrink();
         return MediaQuery(
           data: media.copyWith(
             textScaler: TextScaler.linear(settings.fontScale),
           ),
-          child: child ?? const SizedBox.shrink(),
+          child: Platform.isAndroid
+              ? PiPSwitcher(
+                  childWhenDisabled: content,
+                  childWhenEnabled: const PipVideoSurface(),
+                )
+              : content,
         );
       },
     );
