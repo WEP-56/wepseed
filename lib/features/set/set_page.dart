@@ -15,6 +15,7 @@ import '../../core/utils/open_url.dart';
 import '../../data/models/models.dart';
 import '../../data/update/github_update_service.dart';
 import '../../providers/feed_providers.dart';
+import '../../providers/radar_providers.dart';
 import '../../providers/settings_provider.dart';
 import 'llm_settings_section.dart';
 
@@ -114,6 +115,18 @@ class SetPage extends ConsumerWidget {
                   title: '刷新频率',
                   subtitle: '后台每 ${settings.refreshMinutes} 分钟（系统最短约 15 分）',
                   onTap: () => _openRefresh(context, controller, settings),
+                ),
+                _SwitchTile(
+                  icon: Icons.public_outlined,
+                  title: '显示探索页',
+                  subtitle: '底栏 Explore · RSSHub 雷达入口',
+                  value: ref.watch(showExploreTabProvider),
+                  onChanged: (v) {
+                    ref.read(showExploreTabProvider.notifier).setEnabled(v);
+                    if (!v) {
+                      // If explore was selected, shell remaps index safely.
+                    }
+                  },
                 ),
               ],
             ),

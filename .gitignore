@@ -52,6 +52,8 @@ app.*.map.json
 docs/SIGNING.private.md
 docs/_signing_values.txt
 docs/_secrets_scratch.txt
+docs/_routes_raw.json
+docs/_radar_extract.json
 **/wepseed-keystore.b64
 
 # Local Claude / IDE noise

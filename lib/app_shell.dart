@@ -3,17 +3,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/ui/app_toast.dart';
+import 'features/explore/explore_page.dart';
 import 'features/me/me_page.dart';
 import 'features/media/media_player_widgets.dart';
 import 'features/new/new_page.dart';
 import 'features/set/set_page.dart';
+import 'providers/radar_providers.dart';
 import 'providers/shell_providers.dart';
 import 'widgets/glass_bottom_nav.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
-
-  static const _pages = <Widget>[NewPage(), MePage(), SetPage()];
 
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
@@ -21,6 +21,13 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> {
   DateTime? _lastBackAt;
+
+  Widget _pageFor(AppTab tab) => switch (tab) {
+    AppTab.news => const NewPage(),
+    AppTab.explore => const ExplorePage(),
+    AppTab.me => const MePage(),
+    AppTab.set => const SetPage(),
+  };
 
   void _onPopInvoked(bool didPop, dynamic result) {
     if (didPop) return;
@@ -42,6 +49,10 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   Widget build(BuildContext context) {
     final tabIndex = ref.watch(tabIndexProvider);
+    final showExplore = ref.watch(showExploreTabProvider);
+    final tabs = visibleAppTabs(showExplore);
+    final safeIndex = tabIndex.clamp(0, tabs.length - 1);
+    final current = tabs[safeIndex];
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottom = MediaQuery.paddingOf(context).bottom;
 
@@ -74,8 +85,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                     );
                   },
                   child: KeyedSubtree(
-                    key: ValueKey<int>(tabIndex),
-                    child: AppShell._pages[tabIndex],
+                    key: ValueKey<AppTab>(current),
+                    child: _pageFor(current),
                   ),
                 ),
               ),
@@ -84,7 +95,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                 right: 0,
                 bottom: 0,
                 child: GlassBottomNav(
-                  index: tabIndex,
+                  index: safeIndex,
+                  showExplore: showExplore,
                   onChanged: (i) =>
                       ref.read(tabIndexProvider.notifier).setTab(i),
                 ),

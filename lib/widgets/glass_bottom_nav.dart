@@ -6,6 +6,7 @@ import '../core/theme/app_colors.dart';
 import '../core/utils/monogram.dart';
 import '../data/models/models.dart';
 import '../providers/settings_provider.dart';
+import '../providers/shell_providers.dart';
 import 'liquid_glass.dart';
 
 class GlassBottomNav extends ConsumerWidget {
@@ -13,10 +14,12 @@ class GlassBottomNav extends ConsumerWidget {
     super.key,
     required this.index,
     required this.onChanged,
+    this.showExplore = true,
   });
 
   final int index;
   final ValueChanged<int> onChanged;
+  final bool showExplore;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,9 +28,13 @@ class GlassBottomNav extends ConsumerWidget {
         const UserProfile(displayName: '旅人');
     final bottom = MediaQuery.paddingOf(context).bottom;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tabs = visibleAppTabs(showExplore);
+
+    // Horizontal inset shrinks slightly when 4 tabs are visible.
+    final hInset = tabs.length >= 4 ? 48.0 : 72.0;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(72, 0, 72, bottom > 0 ? bottom + 4 : 10),
+      padding: EdgeInsets.fromLTRB(hInset, 0, hInset, bottom > 0 ? bottom + 4 : 10),
       child: LiquidGlass(
         borderRadius: 28,
         blur: 30,
@@ -37,31 +44,54 @@ class GlassBottomNav extends ConsumerWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _NavIcon(
-                selected: index == 0,
-                icon: Icons.search_rounded,
-                onTap: () => _tap(0),
-              ),
-              _NavIcon(
-                selected: index == 1,
-                child: MonogramAvatar(
-                  label: user.displayName,
-                  size: 22,
-                  filled: index == 1,
+              for (var i = 0; i < tabs.length; i++)
+                _itemForTab(
+                  tab: tabs[i],
+                  selected: index == i,
+                  user: user,
+                  onTap: () => _tap(i),
                 ),
-                onTap: () => _tap(1),
-              ),
-              _NavIcon(
-                selected: index == 2,
-                icon: Icons.home_outlined,
-                activeIcon: Icons.home_rounded,
-                onTap: () => _tap(2),
-              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _itemForTab({
+    required AppTab tab,
+    required bool selected,
+    required UserProfile user,
+    required VoidCallback onTap,
+  }) {
+    return switch (tab) {
+      AppTab.news => _NavIcon(
+        selected: selected,
+        icon: Icons.search_rounded,
+        onTap: onTap,
+      ),
+      AppTab.explore => _NavIcon(
+        selected: selected,
+        icon: Icons.public_outlined,
+        activeIcon: Icons.public_rounded,
+        onTap: onTap,
+      ),
+      AppTab.me => _NavIcon(
+        selected: selected,
+        child: MonogramAvatar(
+          label: user.displayName,
+          size: 22,
+          filled: selected,
+        ),
+        onTap: onTap,
+      ),
+      AppTab.set => _NavIcon(
+        selected: selected,
+        icon: Icons.home_outlined,
+        activeIcon: Icons.home_rounded,
+        onTap: onTap,
+      ),
+    };
   }
 
   void _tap(int i) {
@@ -88,40 +118,24 @@ class _NavIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final active = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-    final idle = isDark
-        ? AppColors.textTertiaryDark
-        : AppColors.textTertiaryLight;
+    final color = selected
+        ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
+        : (isDark ? AppColors.textTertiaryDark : AppColors.textTertiaryLight);
 
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 48,
+        height: 46,
         child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutCubic,
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: selected
-                  ? (isDark
-                        ? Colors.white.withValues(alpha: 0.1)
-                        : Colors.black.withValues(alpha: 0.05))
-                  : Colors.transparent,
-            ),
-            child:
-                child ??
-                Icon(
-                  selected ? (activeIcon ?? icon) : icon,
-                  size: 20,
-                  color: selected ? active : idle,
-                ),
-          ),
+          child:
+              child ??
+              Icon(
+                selected ? (activeIcon ?? icon) : icon,
+                size: 22,
+                color: color,
+              ),
         ),
       ),
     );

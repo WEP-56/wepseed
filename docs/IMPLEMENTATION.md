@@ -1,8 +1,8 @@
 # WEPSEED 功能实现文档
 
-> 版本：**0.0.7**（tag `v0.0.7` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
+> 版本：**0.0.8**（tag `v0.0.8` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
 > 平台：Flutter · Android 首发 · 本地优先（local-only）  
-> 状态：**0.0.7 待真机**：YouTube 规范 Atom / XML 编码 / 清过期 ETag + 应用图标替换  
+> 状态：**0.0.8 待真机**：Explore RSSHub 雷达 + 0.0.7 RSS 兼容与图标  
 > 开关：`kUseMockFeed` / `kUseMockComments`（`lib/core/config/app_flags.dart`）
 
 本文档只写**要做什么、做成什么样、怎么落地**。  
@@ -956,15 +956,15 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.1 一句话
 
-**`v0.0.7` 已打 tag 待真机：RSS 首修（YouTube 规范 Atom / XML 编码 / 清过期 ETag）+ 启动图标替换。0.0.6 媒体/PiP 已通过。下一：真机验收本轮 + RSSHub/偶发拉取余项。**
+**`v0.0.8` 待真机：Explore RSSHub 雷达（实例/来源/表单/测试/添加/草稿，Set 可关入口）+ 承接 0.0.7 的 YouTube/编码/validator/图标。**
 
 ### 15.2 现状速查
 
 | 模块 | 路径 / 要点 |
 |------|-------------|
-| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.7`** |
+| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.8`** |
 | Flag | `kUseMockFeed=false`；`kUseMockComments=false` |
-| 版本 | `pubspec` `0.0.7+7` |
+| 版本 | `pubspec` `0.0.8+8` |
 | Drift | **schemaVersion = 7**；评论任务表 + articles 媒体字段 + media_chat_messages |
 | 评论清洗 | `lib/data/llm/llm_text_sanitize.dart` · complete 后 + 入库前 |
 | 评论任务 | `lib/data/comments/comment_generation_engine.dart` · `comment_job_repository*` · `comment_job_worker.dart` |
@@ -972,6 +972,8 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 | RSS 客户端 | `lib/data/rss/rss_client.dart`：YouTube 别名、编码解码、`resolvedUrl` |
 | RSS 仓库 | `lib/data/repositories/drift_feed_repository.dart`：规范 URL 入库；200 写回/清除 validator |
 | RSS 回归 | `test/rss_parser_test.dart`（YouTube / charset / stale ETag） |
+| Explore 雷达 | `features/explore/` · `assets/rsshub/radar_catalog.json` · `docs/RSSHUB_RADAR.md` · 草稿 `radar_prefs.json` |
+| 底栏 Tab | `AppTab`：New / Explore? / ME / Set；`showExploreTab` 本地 prefs |
 | RSS 后台 | `scheduleFromDatabase` · `runRssRefreshJob` · `DartPluginRegistrant` |
 | 评论 WM | one-off `wepseed.drain-comment-jobs`（≠ RSS） |
 | 媒体 | `features/media/` · `mediaSessionProvider` · just_audio/audio_service · video_player |
@@ -981,9 +983,9 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.3 下一会话建议顺序
 
-1. **真机验收本轮 RSS 修复**：添加 YouTube 频道页 / `@handle` / `/channel/UC…`，确认入库 URL 为 Atom、重复添加不双订；找一个非 UTF-8 或声明 charset 的源；刷新路径上确认 validator 清除后仍能拉新文  
-2. **RSSHub / 仍失败源**：抓 HTTP 状态、跳转、Content-Type 与 XML 前缀，补最小回归夹具后再改（勿盲改解析器）  
-3. **拉取稳定性余项**：若仍有偶发空刷/丢文，分层记请求、条件缓存、解析条数、upsert、UI Stream  
+1. **RSSHub 雷达 UI**（数据已备）：`docs/RSSHUB_RADAR.md` + `assets/rsshub/radar_catalog.json`（精选实例/来源/表单参数；无高校政府长尾）→ 探索 Tab + 设置开关 + 测试/添加/草稿  
+2. **真机验收 0.0.7 RSS 修复**（若未做完）：YouTube 规范 URL、编码、validator  
+3. **拉取稳定性余项**：若仍有偶发空刷/丢文，分层定位  
 4. 可选：媒体 M3 / WebView（§15.6）/ E-ROM
 
 ### 15.4 不要做的事
@@ -1008,8 +1010,8 @@ flutter pub get
 flutter analyze
 flutter test
 flutter run -d <device>
-# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.7
-# 首选 wepseed-0.0.7-arm64-v8a.apk
+# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.8
+# 首选 wepseed-0.0.8-arm64-v8a.apk
 ```
 
 ### 15.6 Backlog：应用内 WebView 阅读器（Phase F 余）
@@ -1064,8 +1066,9 @@ flutter run -d <device>
 | **0.0.4** | 评论 sanitize；ME 列表 CRUD；RSS WM 加固；**真机综合测通过** |
 | **0.0.5** | D-task；schema 6 媒体识别；音频/视频/全局 mini；音频系统媒体会话；媒体 AI 对话窗 |
 | **0.0.6** | Android 视频 PiP（手动 / 回桌面自动）；schema 7 媒体 LLM 对话持久化与待回复续接；**真机通过** |
-| **0.0.7** | YouTube 规范 Atom + 去重；XML 声明编码；200 清除过期 ETag/Last-Modified；应用启动图标；**待真机** |
-| **未收口** | 0.0.7 **真机验收**；RSSHub / 其它坏源；拉取稳定性余项；媒体 M3；流式/WebView；E-ROM 可选 |
+| **0.0.7** | YouTube 规范 Atom + 去重；XML 声明编码；200 清除过期 ETag/Last-Modified；应用启动图标 |
+| **0.0.8** | Explore RSSHub 雷达（精选实例/来源/表单/测试/添加/草稿）；底栏可关探索入口；**待真机** |
+| **未收口** | 0.0.8 **真机验收**；公网实例波动；拉取稳定性余项；媒体 M3；流式/WebView；E-ROM 可选 |
 
 ### 15.9 会话记录
 
@@ -1094,18 +1097,18 @@ flutter run -d <device>
 - 媒体 AI：关闭、重开与生成中续接；消息持久化 **通过**  
 - D-task：杀进程后的评论任务恢复 **通过**
 
-**0.0.7 发版（待真机）：**  
-- YouTube：`/channel/UC…`、`@handle`、`/user/`、`/c/` → 官方 `feeds/videos.xml?channel_id=`；`resolvedUrl` 规范入库，重复添加刷新已有源  
-- 编码：`_decodeXmlBody` 读 Content-Type charset 与 XML `encoding=`（不依赖 HTTP 默认 charset）  
-- 刷新：成功 200 且响应无 ETag/Last-Modified 时清库内旧 validator，避免后续误 304  
-- 图标：`assets/icon/app_icon.png` + `flutter_launcher_icons` 替换默认 Flutter 图标  
-- 变更：`rss_client.dart` · `rss_models.dart` · `drift_feed_repository.dart` · Android mipmap/adaptive  
-- 回归：`test/rss_parser_test.dart`（charset / YouTube / 规范 URL / clear validators）  
-- **未做**：实机；RSSHub 专项；全链路偶发空刷的完整分层日志
+**0.0.7 发版：**  
+- YouTube：`/channel/UC…`、`@handle`、`/user/`、`/c/` → 官方 Atom；规范 URL 入库去重  
+- 编码 / 清过期 ETag；启动图标  
+
+**0.0.8 发版（待真机）：**  
+- Explore 雷达：精选 `radar_catalog.json` + 实例/来源/路由表单 + 测试/添加/草稿自动保存  
+- 底栏 Explore（地球图标）；Set「显示探索页」可关  
+- 文档：`docs/RSSHUB_RADAR.md`；单测 `test/radar_url_test.dart`  
 
 **下会话：**  
-1. 真机验收 0.0.7（YouTube 添加/去重、编码源、validator、新图标）  
-2. 仍失败则抓 RSSHub / 目标源真实响应再补夹具  
+1. 真机验收 0.0.8（雷达订阅 + 0.0.7 兼容项）  
+2. 公网实例失败换实例；必要时补路由精选  
 3. 拉取稳定性余项分层定位（若复现）
 
 ---
