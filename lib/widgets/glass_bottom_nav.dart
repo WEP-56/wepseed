@@ -72,8 +72,9 @@ class GlassBottomNav extends ConsumerWidget {
       ),
       AppTab.explore => _NavIcon(
         selected: selected,
-        icon: Icons.public_outlined,
-        activeIcon: Icons.public_rounded,
+        // Clean outline mountain — matches WEPSEED minimal chrome (no filled glow).
+        icon: Icons.terrain_outlined,
+        activeIcon: Icons.terrain_rounded,
         onTap: onTap,
       ),
       AppTab.me => _NavIcon(

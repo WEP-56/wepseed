@@ -2,7 +2,7 @@
 
 > 版本：**0.0.8**（tag `v0.0.8` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
 > 平台：Flutter · Android 首发 · 本地优先（local-only）  
-> 状态：**0.0.8 待真机**：Explore RSSHub 雷达 + 0.0.7 RSS 兼容与图标  
+> 状态：**0.0.8 功能真机 OK**；Explore UI 已改为横向步骤+抽屉；图标改为干净黑底白标  
 > 开关：`kUseMockFeed` / `kUseMockComments`（`lib/core/config/app_flags.dart`）
 
 本文档只写**要做什么、做成什么样、怎么落地**。  
@@ -93,13 +93,12 @@ test/
 
 ### 1.3 明确未做 / 下一会话主路径
 
-**0.0.6 真机已通过**；RSS 兼容性与拉取稳定性已有一轮代码修复（**未真机**，有单测）。
+**0.0.8 功能真机 OK**（雷达订阅 + 0.0.7 兼容）；Explore UI/图标已收口。
 
 | 优先级 | 项 |
 |--------|-----|
-| 中 | **RSS 真机验收**：YouTube `/channel/UC` / `@handle` / `/c/` / `/user/` 添加与刷新；非 UTF-8 源；刷新后 ETag 消失不误 304 |
-| 中 | **RSSHub / 余兼容**：RSSHub 与其它特殊源若仍失败，抓真实响应再补夹具（勿盲改解析器） |
-| 中 | **内容拉取稳定性余项**：除 validator 清除外，仍需对偶发失败分层定位（请求/跳转/解析/upsert/UI Stream） |
+| 低 | **Explore 体验余项**：步骤记忆、来源网格、实例 healthz 提示 |
+| 中 | **内容拉取稳定性余项**：偶发失败分层定位（请求/跳转/解析/upsert/UI Stream） |
 | 低 | 媒体 M3：进度持久化、下载缓存 |
 | 中 | E-ROM 长期：极端省电/多 ROM 文档与验收可继续补 |
 | 低 | 评论流式气泡；应用内 WebView（§15.6） |
@@ -956,7 +955,7 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.1 一句话
 
-**`v0.0.8` 待真机：Explore RSSHub 雷达（实例/来源/表单/测试/添加/草稿，Set 可关入口）+ 承接 0.0.7 的 YouTube/编码/validator/图标。**
+**`v0.0.8`：Explore 雷达功能真机通过；UI 已收成横向步骤条 + 底部抽屉选择（对齐 Set）；启动图标改为干净黑底白标（去炫光）。下一会话可做体验打磨余项或其它 backlog。**
 
 ### 15.2 现状速查
 
@@ -972,21 +971,24 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 | RSS 客户端 | `lib/data/rss/rss_client.dart`：YouTube 别名、编码解码、`resolvedUrl` |
 | RSS 仓库 | `lib/data/repositories/drift_feed_repository.dart`：规范 URL 入库；200 写回/清除 validator |
 | RSS 回归 | `test/rss_parser_test.dart`（YouTube / charset / stale ETag） |
-| Explore 雷达 | `features/explore/` · `assets/rsshub/radar_catalog.json` · `docs/RSSHUB_RADAR.md` · 草稿 `radar_prefs.json` |
-| 底栏 Tab | `AppTab`：New / Explore? / ME / Set；`showExploreTab` 本地 prefs |
+| Explore 雷达 | `features/explore/explore_page.dart`：**横向 4 步**（实例→来源→参数→完成）；选择用 **bottom sheet**；测试/添加/草稿 |
+| 雷达数据 | `assets/rsshub/radar_catalog.json` · 文档 `docs/RSSHUB_RADAR.md` · 重建 `docs/_build_radar_catalog.py` |
+| 雷达草稿 | `RadarPrefs` → 应用支持目录 `radar_prefs.json`（`showExploreTab` + draft） |
+| 底栏 Tab | `AppTab`：New / Explore? / ME / Set；Explore 图标 **terrain**（山）；Set 可关入口 |
+| 启动图标 | `assets/icon/app_icon.png` + `app_icon_fg.png`；黑底 `#0A0A0A` 白标；`dart run flutter_launcher_icons` |
 | RSS 后台 | `scheduleFromDatabase` · `runRssRefreshJob` · `DartPluginRegistrant` |
 | 评论 WM | one-off `wepseed.drain-comment-jobs`（≠ RSS） |
 | 媒体 | `features/media/` · `mediaSessionProvider` · just_audio/audio_service · video_player |
 | 媒体 AI | 仅音视频详情「一起聊」；默认模型；**Drift 持久会话 / 待回复续接**；不写网友评论任务 |
 | 通知 | channel `rss_updates`；深链 **`push` only** |
-| 债表 | **§1.5**（F-rss-compat / F-feed-fetch **部分修，未真机**） |
+| 债表 | **§1.5** |
 
 ### 15.3 下一会话建议顺序
 
-1. **RSSHub 雷达 UI**（数据已备）：`docs/RSSHUB_RADAR.md` + `assets/rsshub/radar_catalog.json`（精选实例/来源/表单参数；无高校政府长尾）→ 探索 Tab + 设置开关 + 测试/添加/草稿  
-2. **真机验收 0.0.7 RSS 修复**（若未做完）：YouTube 规范 URL、编码、validator  
-3. **拉取稳定性余项**：若仍有偶发空刷/丢文，分层定位  
-4. 可选：媒体 M3 / WebView（§15.6）/ E-ROM
+1. **Explore 体验余项（可选）**：步骤记忆进草稿、来源网格/热度排序、自定义实例测 healthz、空态引导去添加  
+2. **拉取稳定性**：公网 RSSHub 实例失败的用户文案与换实例提示  
+3. **媒体 M3 / WebView / E-ROM**（见 §15.6）  
+4. 勿默认再抬版本，除非有可发版增量  
 
 ### 15.4 不要做的事
 
@@ -997,6 +999,9 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 - 大改 RSS 解析（除非源坏了）；YouTube 已走官方 Atom，勿改回硬爬 HTML 列表  
 - 条件请求时对 YouTube **频道页** 带旧 ETag（304 无 body 抽不出 channel id）  
 - 200 成功却「保留旧 etag/lastModified」当响应未返回时  
+- Explore 退回 **DropdownButton** 填表风（应继续用 sheet + 步骤）  
+- 启动图标再叠 soft glow / 灰渐变底（保持干净黑底白标）  
+- 把完整 `routes.json`（数 MB）打进 APK  
 - 重做整套 LLM 协议  
 - 提交 `*.jks` / `key.properties` / `SIGNING.private.md`  
 - 把 Gradle 再改回「Aliyun 优先」  
@@ -1067,8 +1072,8 @@ flutter run -d <device>
 | **0.0.5** | D-task；schema 6 媒体识别；音频/视频/全局 mini；音频系统媒体会话；媒体 AI 对话窗 |
 | **0.0.6** | Android 视频 PiP（手动 / 回桌面自动）；schema 7 媒体 LLM 对话持久化与待回复续接；**真机通过** |
 | **0.0.7** | YouTube 规范 Atom + 去重；XML 声明编码；200 清除过期 ETag/Last-Modified；应用启动图标 |
-| **0.0.8** | Explore RSSHub 雷达（精选实例/来源/表单/测试/添加/草稿）；底栏可关探索入口；**待真机** |
-| **未收口** | 0.0.8 **真机验收**；公网实例波动；拉取稳定性余项；媒体 M3；流式/WebView；E-ROM 可选 |
+| **0.0.8** | Explore 雷达（功能真机 OK）；横向步骤 + sheet 选择；干净黑底白标图标；底栏可关 Explore |
+| **未收口** | Explore 体验余项；公网实例波动文案；拉取稳定性；媒体 M3；流式/WebView；E-ROM 可选 |
 
 ### 15.9 会话记录
 
@@ -1101,15 +1106,17 @@ flutter run -d <device>
 - YouTube：`/channel/UC…`、`@handle`、`/user/`、`/c/` → 官方 Atom；规范 URL 入库去重  
 - 编码 / 清过期 ETag；启动图标  
 
-**0.0.8 发版（待真机）：**  
-- Explore 雷达：精选 `radar_catalog.json` + 实例/来源/路由表单 + 测试/添加/草稿自动保存  
-- 底栏 Explore（地球图标）；Set「显示探索页」可关  
+**0.0.8 发版：**  
+- Explore 雷达：精选 catalog；功能真机通过  
+- UI 收口：横向步骤（实例→来源→参数→完成）+ 底部抽屉选择（对齐 Set）；底栏 terrain 山形图标  
+- 图标：去 soft glow，黑底 `#0A0A0A` 白标；adaptive fg 透明底  
+- Set「显示探索页」可关；草稿 `radar_prefs.json`  
 - 文档：`docs/RSSHUB_RADAR.md`；单测 `test/radar_url_test.dart`  
 
 **下会话：**  
-1. 真机验收 0.0.8（雷达订阅 + 0.0.7 兼容项）  
-2. 公网实例失败换实例；必要时补路由精选  
-3. 拉取稳定性余项分层定位（若复现）
+1. Explore 体验余项（可选）或稳定性/媒体 M3  
+2. 公网实例失败换实例提示  
+3. 按用户反馈迭代
 
 ---
 
