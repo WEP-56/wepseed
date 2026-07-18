@@ -1,8 +1,8 @@
 # WEPSEED 功能实现文档
 
-> 版本：**0.0.6**（tag `v0.0.6` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
+> 版本：**0.0.7**（tag `v0.0.7` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
 > 平台：Flutter · Android 首发 · 本地优先（local-only）  
-> 状态：**0.0.6 代码完成，待真机安装验收**；修复视频后台 PiP 与媒体 LLM 对话持久化  
+> 状态：**0.0.7 待真机**：YouTube 规范 Atom / XML 编码 / 清过期 ETag + 应用图标替换  
 > 开关：`kUseMockFeed` / `kUseMockComments`（`lib/core/config/app_flags.dart`）
 
 本文档只写**要做什么、做成什么样、怎么落地**。  
@@ -31,7 +31,7 @@
 | 刷 | New masonry 流 + 源主页 | **真 Stream + 下拉刷新**（时间轨已移除；**筛选已接**） |
 | 读 | 详情正文、已读、收藏 | **HTML 正文 + 图缓存 + 目录 scrubber**；外链系统浏览器 |
 | 播 | RSS 音频 / 视频 | **文章级媒体识别 + 沉浸详情播放器 + 全局 mini + 音频后台通知 + 视频全屏 / Android PiP** |
-| 评 | TikTok 式评论区 + 多网友 | **真 LLM**；无 Key 不灌 mock；**去 think/tool 清洗**（0.0.4 真机通过）；**D-task 已接**（`comment_jobs` + one-off WM，待真机） |
+| 评 | TikTok 式评论区 + 多网友 | **真 LLM**；无 Key 不灌 mock；**去 think/tool 清洗**（0.0.4 真机通过）；**D-task 已验收**（`comment_jobs` + one-off WM） |
 | 回看 | ME 时间轴 | **Drift**；三 stat → 列表 CRUD（收藏/对话/痕迹，0.0.4 真机通过） |
 | 设 | 形象、主题、字号、多提供商/网友、DATA、关于 | **大部分真持久化**；关于 = 真版本 + GitHub 更新/协议 |
 | 推 | WorkManager + 本地通知 | **已接 + 加固**：冷启动重排程、后台 isolate 插件注册、通知 channel、杀进程仍周期刷源+通知（OEM 另见 E-ROM） |
@@ -93,12 +93,13 @@ test/
 
 ### 1.3 明确未做 / 下一会话主路径
 
-**0.0.6 代码与自动化测试已通过**；视频 PiP、持久媒体对话与 RSS 兼容性待本轮真机验收。
+**0.0.6 真机已通过**；RSS 兼容性与拉取稳定性已有一轮代码修复（**未真机**，有单测）。
 
 | 优先级 | 项 |
 |--------|-----|
-| 中 | **0.0.6 真机验收**：视频回桌面 PiP / 手动小窗；媒体 AI 关闭与生成中续接 |
-| 中 | **RSS 兼容性**：YouTube 订阅 / RSSHub 订阅在添加阶段失败；下次单开排查与回归夹具 |
+| 中 | **RSS 真机验收**：YouTube `/channel/UC` / `@handle` / `/c/` / `/user/` 添加与刷新；非 UTF-8 源；刷新后 ETag 消失不误 304 |
+| 中 | **RSSHub / 余兼容**：RSSHub 与其它特殊源若仍失败，抓真实响应再补夹具（勿盲改解析器） |
+| 中 | **内容拉取稳定性余项**：除 validator 清除外，仍需对偶发失败分层定位（请求/跳转/解析/upsert/UI Stream） |
 | 低 | 媒体 M3：进度持久化、下载缓存 |
 | 中 | E-ROM 长期：极端省电/多 ROM 文档与验收可继续补 |
 | 低 | 评论流式气泡；应用内 WebView（§15.6） |
@@ -111,6 +112,9 @@ test/
 | Feed/Article DI | `kUseMockFeed ? Mock* : Drift*` | 默认 **false** |
 | 删除源 | 硬删 feed + articles | 见 `DriftFeedRepository` 注释 |
 | Guid | guid → link → sha1(title\|published) | 刷新 upsert 不重复 |
+| Feed URL | 以 `fetch.resolvedUrl`（YouTube 规范 Atom 等）入库 / 去重 | 勿用页面 URL 与 Atom URL 各订一次 |
+| RSS 体编码 | `_decodeXmlBody`：header charset / XML 声明 / UTF-8 / latin1 | 勿假设 `response.body` 默认 charset |
+| 条件缓存 | 200 时 `etag`/`lastModified` 以响应为准（可 null 清除） | 避免服务端停发 validator 后误 304 |
 | 外链 | `openExternalUrl` → 系统浏览器 | WebView 见 §15.6 |
 | Scrubber | `EdgeScrubber` | **仅详情** h1–h3；New **不挂**时间轨 |
 | LLM | `http_llm_client` + `scheduled_llm_client` + **`llm_text_sanitize`** | 重试 `_postJson`；测连绕过 scheduler；入库前清洗 think/tool |
@@ -127,9 +131,9 @@ test/
 | 评论任务 | `comment_jobs` + `comment_job_items` · `CommentGenerationEngine` · `runCommentJobsDrain` | taskName **`wepseed.drain-comment-jobs`**（≠ RSS）；租约防 UI/WM 双跑；冷启动 `recoverCommentJobsOnColdStart` + UI `recoverPendingJobs` |
 | 媒体 | `mediaSessionProvider` + `DetailMediaPlayer` + `MiniMediaPlayer` | 全局单会话；媒体 AI 对话不写 comments/jobs |
 
-### 1.5 已知问题 / 技术债（登记 · **D-task 代码后**）
+### 1.5 已知问题 / 技术债（登记 · **RSS 兼容首轮代码后 · 未真机**）
 
-> 下会话：优先根据 0.0.6 真机反馈修复；YouTube / RSSHub 添加失败需单开兼容性排查；M3 / E-ROM / F 余可选。
+> 下会话：优先真机验收 YouTube 规范 URL 与编码/validator 修复；RSSHub 与其它偶发拉取问题再抓响应分层定位；M3 / E-ROM / F 余可选。
 
 | # | 现象 | 状态 |
 |---|------|------|
@@ -139,10 +143,22 @@ test/
 | F-back / F-notif-back / F-filter / F-toast / F-about / F-llm | UX 债 | **关闭**（0.0.2–0.0.3 真机） |
 | F-comment-think | 评论展示思考过程 / toolcall | **关闭**（`sanitizeLlmCommentText`；**0.0.4 真机通过**） |
 | F-me-lists | ME 收藏/对话/痕迹不可点 | **关闭**（列表 CRUD；**0.0.4 真机通过**） |
-| **D-task** | 评论生成杀进程丢任务 | **代码已接**（schema 5 + one-off WM）；**待真机验收** |
-| **P1-media** | 视频后台 PiP / 媒体 AI 持久化 | **代码已接**（schema 7）；**待真机验收** |
-| **F-rss-compat** | YouTube 订阅链接、RSSHub 订阅链接无法添加 | **已登记，未修**；先抓取真实响应并补夹具，再决定客户端请求头 / 跳转 / XML 兼容策略，勿盲改解析器 |
+| **D-task** | 评论生成杀进程丢任务 | **关闭**（schema 5 + one-off WM；0.0.6 真机通过） |
+| **P1-media** | 视频后台 PiP / 媒体 AI 持久化 | **关闭**（schema 7；0.0.6 真机通过） |
+| **F-rss-compat** | YouTube / RSSHub 等订阅添加失败 | **部分修（代码+单测，未真机）**：YouTube `/channel/UC…` 直转 Atom；`@handle` / `/user/` / `/c/` 先抽 `channelId`/`externalId` 再转 `feeds/videos.xml`；入库用 **规范 URL** 防重复。RSSHub / 其它源仍可能失败 → 抓真实响应再补 |
+| **F-feed-fetch** | 已订阅源刷新/内容拉取偶发不稳 | **部分修（代码+单测，未真机）**：① XML 声明编码（不依赖 HTTP charset）② 成功 200 但响应无 ETag/Last-Modified 时 **清除旧 validator**，避免后续误 304。其它层（跳转/解析/upsert/UI）仍待分层定位 |
 | E-ROM | 厂商杀后台 | Set 有提示；**0.0.4 综合测无问题**；极端 ROM 长期可续 |
+
+**RSS 兼容首轮（代码分析 + Mock 单测 · 未真机）：**
+
+| 点 | 做法 | 路径 |
+|----|------|------|
+| YouTube 规范订阅 | `/channel/UC…` → `www.youtube.com/feeds/videos.xml?channel_id=`；频道页 HTML 抽 id 后同 | `RssClient.fetch` |
+| 规范 URL 入库 | `FeedFetchResult.resolvedUrl`；`addFeed` 以解析后 URL 去重 / 写入 | `DriftFeedRepository.addFeed` |
+| 频道页勿带条件请求 | `@`/`user`/`c` 页 GET **不**发 ETag（304 无 body 无法抽 channel id） | `RssClient` |
+| XML 编码 | Content-Type charset → XML `encoding=` → UTF-8 → latin1 回退；剥 BOM | `RssClient._decodeXmlBody` |
+| 过期 validator | 200 成功写回 `etag`/`lastModified`（含 null），勿保留服务端已停用的值 | `DriftFeedRepository._refreshRow` |
+| 回归 | 编码、YouTube 直转/handle、规范 URL 不重复、清 validator | `test/rss_parser_test.dart` |
 
 **RSS 后台（杀进程仍通知）— 已加固 + 0.0.4 测过：**
 
@@ -156,7 +172,7 @@ test/
 | 任务名 | `wepseed.periodic-rss-refresh` / `wepseed.refresh-feeds` |
 | OEM 边界 | 强制停止 / 超激进省电仍可能停 WM，需用户放行自启动 |
 
-**D-task（评论杀进程恢复）— 已实现：**
+**D-task（评论杀进程恢复）— 已实现 + 0.0.6 真机通过：**
 
 | 点 | 做法 |
 |----|------|
@@ -644,8 +660,12 @@ data (rss, llm, db, secure_storage, notifications)
 ```
 User/WorkManager
   → FeedRepository.refresh(feedId)
-  → HTTP GET feedUrl (If-None-Match / If-Modified-Since)
-  → Parse items
+  → RssClient.fetch(url, etag?, lastModified?)
+       YouTube 页 → 规范 Atom；频道页 HTML 不带条件头
+  → HTTP GET（If-None-Match / If-Modified-Since，若有）
+  → 304 → 只更新 lastFetchedAt
+  → 200 → _decodeXmlBody → Parse items
+       写回 etag/lastModified（响应无则清 null）
   → Upsert articles
   → Recompute unread
   → If newItems && notificationsEnabled → notify
@@ -768,7 +788,7 @@ Item: pending → running → succeeded | skipped | failed
 - [x] HTTP 有限重试（超时 / 网络 / 429 / 5xx；401 不重试）  
 - [x] 提供商编辑 **测试连接**（独立 HttpLlmClient，不占评论队列）  
 - [x] **评论清洗** `sanitizeLlmCommentText`（think/tool/纯计划独白；**0.0.4 真机通过**）  
-- [x] **D-task**：`comment_jobs` / items + Engine + one-off WM + 冷启动恢复 — **代码已接，待真机**  
+- [x] **D-task**：`comment_jobs` / items + Engine + one-off WM + 冷启动恢复 — **0.0.6 真机通过**  
 - [ ]（可选）流式输出到评论气泡  
 
 ### Phase E — ME 温度与通知 ✅ 主路径
@@ -801,7 +821,9 @@ Item: pending → running → succeeded | skipped | failed
 
 - feed 解析：RSS / Atom 样例夹具  
 - OPML import/export roundtrip  
-- YouTube Atom 与 RSSHub 真实订阅样例：添加、跳转、解析失败文案（待补夹具）  
+- YouTube：`/channel/UC` → Atom；`@handle` HTML 抽 id；规范 URL 入库不重复（`rss_parser_test`；**Mock，未真机**）  
+- XML 声明 charset 解码；200 后清除过期 ETag/Last-Modified（同上）  
+- RSSHub / 真实坏源样例：添加、跳转、解析失败文案（**仍待补夹具**）  
 - unread count 聚合  
 - warm rule 触发与去重  
 - 上下文截断长度  
@@ -898,9 +920,9 @@ UI 只依赖接口；**Phase B 新增 `DriftFeedRepository` / `DriftArticleRepos
 - [x] 返回 / Toast / 关于更新安装 / LLM 重试·测连 / Release  
 - [x] 通知深链返回栈 + New 筛选（0.0.3；**真机通过**）  
 - [x] 评论 think/tool 清洗（0.0.4；**真机通过**）  
-- [x] **D-task** 评论任务持久化 + WM 恢复（**代码已接**；真机验收后 0.0.5）  
+- [x] **D-task** 评论任务持久化 + WM 恢复（**0.0.6 真机通过**）  
 - [ ] 应用内 WebView（F 余）  
-- [x] P1 媒体类型 + 音视频播放器 + 全局 mini + 媒体专属 LLM 对话窗（待真机）
+- [x] P1 媒体类型 + 音视频播放器 + 全局 mini + 媒体专属 LLM 对话窗（**0.0.6 真机通过**）
 
 ---
 
@@ -934,31 +956,35 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.1 一句话
 
-**`v0.0.6` 已完成并进入真机验收：视频 Android PiP + schema 7 媒体对话持久化；关闭或重开对话不丢消息，待回复自动续接。**
+**`v0.0.7` 已打 tag 待真机：RSS 首修（YouTube 规范 Atom / XML 编码 / 清过期 ETag）+ 启动图标替换。0.0.6 媒体/PiP 已通过。下一：真机验收本轮 + RSSHub/偶发拉取余项。**
 
 ### 15.2 现状速查
 
 | 模块 | 路径 / 要点 |
 |------|-------------|
-| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.6`** |
+| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.7`** |
 | Flag | `kUseMockFeed=false`；`kUseMockComments=false` |
-| 版本 | `pubspec` `0.0.6+6` |
+| 版本 | `pubspec` `0.0.7+7` |
 | Drift | **schemaVersion = 7**；评论任务表 + articles 媒体字段 + media_chat_messages |
 | 评论清洗 | `lib/data/llm/llm_text_sanitize.dart` · complete 后 + 入库前 |
 | 评论任务 | `lib/data/comments/comment_generation_engine.dart` · `comment_job_repository*` · `comment_job_worker.dart` |
 | ME 列表 | `/me/bookmarks` · `/me/chats` · `/me/traces` · `me_list_page.dart` |
+| RSS 客户端 | `lib/data/rss/rss_client.dart`：YouTube 别名、编码解码、`resolvedUrl` |
+| RSS 仓库 | `lib/data/repositories/drift_feed_repository.dart`：规范 URL 入库；200 写回/清除 validator |
+| RSS 回归 | `test/rss_parser_test.dart`（YouTube / charset / stale ETag） |
 | RSS 后台 | `scheduleFromDatabase` · `runRssRefreshJob` · `DartPluginRegistrant` |
 | 评论 WM | one-off `wepseed.drain-comment-jobs`（≠ RSS） |
 | 媒体 | `features/media/` · `mediaSessionProvider` · just_audio/audio_service · video_player |
 | 媒体 AI | 仅音视频详情「一起聊」；默认模型；**Drift 持久会话 / 待回复续接**；不写网友评论任务 |
 | 通知 | channel `rss_updates`；深链 **`push` only** |
-| 债表 | **§1.5** |
+| 债表 | **§1.5**（F-rss-compat / F-feed-fetch **部分修，未真机**） |
 
 ### 15.3 下一会话建议顺序
 
-1. **0.0.6 真机**：视频点小窗 / 回桌面 PiP；媒体 AI 关闭、重开、生成中续接  
-2. **RSS 兼容性专项**：复现 YouTube / RSSHub 添加失败，抓 HTTP 状态、跳转、Content-Type 与 XML，补最小回归夹具后修复  
-3. 根据真机反馈修复播放器格式兼容、系统栏与 OEM 后台行为；后续媒体 M3（进度持久化/下载）或 WebView（§15.6）
+1. **真机验收本轮 RSS 修复**：添加 YouTube 频道页 / `@handle` / `/channel/UC…`，确认入库 URL 为 Atom、重复添加不双订；找一个非 UTF-8 或声明 charset 的源；刷新路径上确认 validator 清除后仍能拉新文  
+2. **RSSHub / 仍失败源**：抓 HTTP 状态、跳转、Content-Type 与 XML 前缀，补最小回归夹具后再改（勿盲改解析器）  
+3. **拉取稳定性余项**：若仍有偶发空刷/丢文，分层记请求、条件缓存、解析条数、upsert、UI Stream  
+4. 可选：媒体 M3 / WebView（§15.6）/ E-ROM
 
 ### 15.4 不要做的事
 
@@ -966,7 +992,9 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 - 通知深链改回 `router.go`  
 - 无必要重写 masonry / 玻璃  
 - 应用内 WebView（未明确开工前）  
-- 大改 RSS 解析（除非源坏了）  
+- 大改 RSS 解析（除非源坏了）；YouTube 已走官方 Atom，勿改回硬爬 HTML 列表  
+- 条件请求时对 YouTube **频道页** 带旧 ETag（304 无 body 抽不出 channel id）  
+- 200 成功却「保留旧 etag/lastModified」当响应未返回时  
 - 重做整套 LLM 协议  
 - 提交 `*.jks` / `key.properties` / `SIGNING.private.md`  
 - 把 Gradle 再改回「Aliyun 优先」  
@@ -980,8 +1008,8 @@ flutter pub get
 flutter analyze
 flutter test
 flutter run -d <device>
-# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.6
-# 首选 wepseed-0.0.6-arm64-v8a.apk
+# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.7
+# 首选 wepseed-0.0.7-arm64-v8a.apk
 ```
 
 ### 15.6 Backlog：应用内 WebView 阅读器（Phase F 余）
@@ -1005,7 +1033,7 @@ flutter run -d <device>
 | 范围 | 文章级 `blog`/`audio`/`video`；全局 mini；音频后台通知 |
 | 非目标首版 | 完整播客壳、下载缓存、源级分栏、无直链站点假播放 |
 | 与 LLM | mediaType ≠ blog → 不创建网友评论任务；改用独立「一起聊」悬浮窗 |
-| 余项 | M3：进度持久化、视频 PiP、下载缓存、源级筛选 |
+| 余项 | M3：进度持久化、下载缓存、源级筛选 |
 
 ### 15.7 已知产品决策（勿回退）
 
@@ -1035,8 +1063,9 @@ flutter run -d <device>
 | **0.0.3** | 通知 `push`；New 筛选 schema 4；**真机通过** |
 | **0.0.4** | 评论 sanitize；ME 列表 CRUD；RSS WM 加固；**真机综合测通过** |
 | **0.0.5** | D-task；schema 6 媒体识别；音频/视频/全局 mini；音频系统媒体会话；媒体 AI 对话窗 |
-| **0.0.6** | Android 视频 PiP（手动 / 回桌面自动）；schema 7 媒体 LLM 对话持久化与待回复续接；待真机反馈 |
-| **未收口** | 0.0.6 真机；**YouTube / RSSHub 添加兼容性**；媒体 M3（进度/下载）；流式/WebView；E-ROM 可选 |
+| **0.0.6** | Android 视频 PiP（手动 / 回桌面自动）；schema 7 媒体 LLM 对话持久化与待回复续接；**真机通过** |
+| **0.0.7** | YouTube 规范 Atom + 去重；XML 声明编码；200 清除过期 ETag/Last-Modified；应用启动图标；**待真机** |
+| **未收口** | 0.0.7 **真机验收**；RSSHub / 其它坏源；拉取稳定性余项；媒体 M3；流式/WebView；E-ROM 可选 |
 
 ### 15.9 会话记录
 
@@ -1059,6 +1088,25 @@ flutter run -d <device>
 - just_audio + audio_service 后台通知；video_player + 全屏；全局 mini  
 - 音视频隐藏网友评论，提供临时 LLM「一起聊」悬浮窗  
 - 自动化：媒体解析、类型 roundtrip、评论任务隔离；真机待验收
+
+**0.0.6 发版 + 真机验收：**  
+- 视频：手动小窗与回桌面自动 Android PiP **通过**  
+- 媒体 AI：关闭、重开与生成中续接；消息持久化 **通过**  
+- D-task：杀进程后的评论任务恢复 **通过**
+
+**0.0.7 发版（待真机）：**  
+- YouTube：`/channel/UC…`、`@handle`、`/user/`、`/c/` → 官方 `feeds/videos.xml?channel_id=`；`resolvedUrl` 规范入库，重复添加刷新已有源  
+- 编码：`_decodeXmlBody` 读 Content-Type charset 与 XML `encoding=`（不依赖 HTTP 默认 charset）  
+- 刷新：成功 200 且响应无 ETag/Last-Modified 时清库内旧 validator，避免后续误 304  
+- 图标：`assets/icon/app_icon.png` + `flutter_launcher_icons` 替换默认 Flutter 图标  
+- 变更：`rss_client.dart` · `rss_models.dart` · `drift_feed_repository.dart` · Android mipmap/adaptive  
+- 回归：`test/rss_parser_test.dart`（charset / YouTube / 规范 URL / clear validators）  
+- **未做**：实机；RSSHub 专项；全链路偶发空刷的完整分层日志
+
+**下会话：**  
+1. 真机验收 0.0.7（YouTube 添加/去重、编码源、validator、新图标）  
+2. 仍失败则抓 RSSHub / 目标源真实响应再补夹具  
+3. 拉取稳定性余项分层定位（若复现）
 
 ---
 

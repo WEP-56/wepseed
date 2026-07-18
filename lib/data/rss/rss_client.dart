@@ -1,8 +1,10 @@
+import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 import 'rss_models.dart';
 
-/// Thin HTTP wrapper for feed GET with conditional headers.
+/// HTTP wrapper for feed GETs, conditional requests, and common feed aliases.
 class RssClient {
   RssClient({http.Client? client}) : _client = client ?? http.Client();
 
@@ -21,14 +23,40 @@ class RssClient {
       throw RssException('请输入有效的 http(s) 订阅地址');
     }
 
+    final youtubeChannelId = _youtubeChannelIdFromUri(uri);
+    if (youtubeChannelId != null) {
+      return _fetchUri(
+        _youtubeFeedUri(youtubeChannelId),
+        etag: etag,
+        lastModified: lastModified,
+      );
+    }
+
+    // YouTube's channel pages are HTML, but contain the UC... id required by
+    // its official Atom endpoint. Do not send page validators: a 304 page has
+    // no body from which to recover the canonical feed URL.
+    if (_isYouTubeChannelPage(uri)) {
+      final page = await _fetchUri(uri);
+      if (page.notModified || page.body == null) return page;
+      final channelId = _youtubeChannelIdFromHtml(page.body!);
+      if (channelId != null) return _fetchUri(_youtubeFeedUri(channelId));
+      return page;
+    }
+
+    return _fetchUri(uri, etag: etag, lastModified: lastModified);
+  }
+
+  Future<FeedFetchResult> _fetchUri(
+    Uri uri, {
+    String? etag,
+    String? lastModified,
+  }) async {
     final headers = <String, String>{
       'User-Agent': _userAgent,
       'Accept':
           'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
     };
-    if (etag != null && etag.isNotEmpty) {
-      headers['If-None-Match'] = etag;
-    }
+    if (etag != null && etag.isNotEmpty) headers['If-None-Match'] = etag;
     if (lastModified != null && lastModified.isNotEmpty) {
       headers['If-Modified-Since'] = lastModified;
     }
@@ -40,32 +68,99 @@ class RssClient {
       throw RssException(_networkMessage(e));
     }
 
+    final resolvedUrl = response.request?.url.toString() ?? uri.toString();
     if (response.statusCode == 304) {
       return FeedFetchResult(
         body: null,
         etag: etag,
         lastModified: lastModified,
+        resolvedUrl: resolvedUrl,
         notModified: true,
       );
     }
-
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw RssException('拉取失败（HTTP ${response.statusCode}）');
+      throw RssException('拉取失败 (HTTP ${response.statusCode})');
     }
 
-    final body = response.body;
-    if (body.trim().isEmpty) {
-      throw RssException('源返回了空内容');
-    }
+    final body = _decodeXmlBody(response);
+    if (body.trim().isEmpty) throw RssException('源返回了空内容');
 
     return FeedFetchResult(
       body: body,
       etag: response.headers['etag'],
       lastModified: response.headers['last-modified'],
+      resolvedUrl: resolvedUrl,
     );
   }
 
   void close() => _client.close();
+
+  String _decodeXmlBody(http.Response response) {
+    final bytes = response.bodyBytes;
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xef &&
+        bytes[1] == 0xbb &&
+        bytes[2] == 0xbf) {
+      return utf8.decode(bytes.sublist(3), allowMalformed: true);
+    }
+
+    final declared = _declaredCharset(response);
+    final encoding = declared == null ? null : Encoding.getByName(declared);
+    if (encoding != null) return encoding.decode(bytes);
+
+    try {
+      return utf8.decode(bytes);
+    } on FormatException {
+      return latin1.decode(bytes);
+    }
+  }
+
+  String? _declaredCharset(http.Response response) {
+    final fromHeader = RegExp(
+      r'''charset\s*=\s*["']?([^;"'\s]+)''',
+      caseSensitive: false,
+    ).firstMatch(response.headers['content-type'] ?? '')?.group(1);
+    if (fromHeader != null) return fromHeader.toLowerCase();
+
+    // XML declarations are ASCII-compatible, so this can inspect the header
+    // before choosing the decoder for the complete response body.
+    final prefix = latin1.decode(
+      response.bodyBytes.take(512).toList(growable: false),
+    );
+    return RegExp(
+      r'''<\?xml[^>]*encoding\s*=\s*["']([^"']+)["']''',
+      caseSensitive: false,
+    ).firstMatch(prefix)?.group(1)?.toLowerCase();
+  }
+
+  bool _isYouTubeChannelPage(Uri uri) {
+    final host = uri.host.toLowerCase();
+    if (host != 'youtube.com' && host != 'www.youtube.com') return false;
+    return uri.path.startsWith('/@') ||
+        uri.path.startsWith('/user/') ||
+        uri.path.startsWith('/c/');
+  }
+
+  String? _youtubeChannelIdFromUri(Uri uri) {
+    final host = uri.host.toLowerCase();
+    if (host != 'youtube.com' && host != 'www.youtube.com') return null;
+    final segments = uri.pathSegments;
+    if (segments.length < 2 || segments.first != 'channel') return null;
+    final id = segments[1];
+    return RegExp(r'^UC[\w-]{20,}$').hasMatch(id) ? id : null;
+  }
+
+  String? _youtubeChannelIdFromHtml(String html) {
+    return RegExp(
+      r'''["'](?:channelId|externalId)["']\s*:\s*["'](UC[\w-]{20,})["']''',
+    ).firstMatch(html)?.group(1);
+  }
+
+  Uri _youtubeFeedUri(String channelId) => Uri.https(
+    'www.youtube.com',
+    '/feeds/videos.xml',
+    {'channel_id': channelId},
+  );
 
   String _networkMessage(Object e) {
     final s = e.toString();

@@ -59,10 +59,20 @@ class DriftFeedRepository implements FeedRepository {
     if (fetch.body == null) {
       throw RssException('无法获取源内容');
     }
-    final parsed = _parser.parse(fetch.body!, sourceUrl: normalized);
+    final resolvedUrl = _normalizeUrl(fetch.resolvedUrl ?? normalized);
+    if (resolvedUrl != normalized) {
+      final resolvedExisting = await (_db.select(
+        _db.feeds,
+      )..where((t) => t.url.equals(resolvedUrl))).getSingleOrNull();
+      if (resolvedExisting != null) {
+        await _refreshRow(resolvedExisting);
+        return;
+      }
+    }
+    final parsed = _parser.parse(fetch.body!, sourceUrl: resolvedUrl);
     final now = DateTime.now();
-    final id = _feedIdForUrl(normalized);
-    final siteUrl = parsed.siteUrl ?? _origin(normalized);
+    final id = _feedIdForUrl(resolvedUrl);
+    final siteUrl = parsed.siteUrl ?? _origin(resolvedUrl);
 
     await _db
         .into(_db.feeds)
@@ -70,7 +80,7 @@ class DriftFeedRepository implements FeedRepository {
           FeedsCompanion.insert(
             id: id,
             title: parsed.title,
-            url: normalized,
+            url: resolvedUrl,
             siteUrl: Value(siteUrl),
             lastFetchedAt: Value(now),
             etag: Value(fetch.etag),
@@ -179,8 +189,10 @@ class DriftFeedRepository implements FeedRepository {
         title: Value(parsed.title),
         siteUrl: Value(parsed.siteUrl ?? row.siteUrl),
         lastFetchedAt: Value(now),
-        etag: Value(fetch.etag ?? row.etag),
-        lastModified: Value(fetch.lastModified ?? row.lastModified),
+        // A successful 200 replaces validators. Keeping a validator which a
+        // server no longer sends can make subsequent refreshes incorrectly 304.
+        etag: Value(fetch.etag),
+        lastModified: Value(fetch.lastModified),
       ),
     );
     await _upsertItems(feedId: row.id, items: parsed.items, fetchedAt: now);

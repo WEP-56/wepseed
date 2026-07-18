@@ -52,12 +52,14 @@ class FeedFetchResult {
     required this.body,
     this.etag,
     this.lastModified,
+    this.resolvedUrl,
     this.notModified = false,
   });
 
   final String? body;
   final String? etag;
   final String? lastModified;
+  final String? resolvedUrl;
   final bool notModified;
 }
 

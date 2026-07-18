@@ -1,9 +1,16 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:wepseed/data/db/app_database.dart';
 import 'package:wepseed/data/models/models.dart';
 import 'package:wepseed/data/rss/opml.dart';
+import 'package:wepseed/data/rss/rss_client.dart';
 import 'package:wepseed/data/rss/rss_parser.dart';
+import 'package:wepseed/data/repositories/drift_feed_repository.dart';
 
 void main() {
   final fixtures = Directory('test/fixtures');
@@ -124,4 +131,126 @@ void main() {
     expect(item.enclosureUrl, isNull);
     expect(item.imageUrl, 'https://cdn.test/cover.jpg');
   });
+
+  test('decodes the XML declaration charset when HTTP omits one', () async {
+    final client = RssClient(
+      client: MockClient(
+        (_) async => http.Response.bytes(
+          latin1.encode(
+            '<?xml version="1.0" encoding="iso-8859-1"?>'
+            '<rss><channel><title>Caf\u00e9</title></channel></rss>',
+          ),
+          200,
+          headers: {'content-type': 'application/xml'},
+        ),
+      ),
+    );
+
+    final result = await client.fetch('https://example.test/feed');
+    expect(RssParser().parse(result.body!).title, 'Caf\u00e9');
+  });
+
+  test('canonicalizes YouTube channel URLs to the Atom feed', () async {
+    const channelId = 'UCabcdefghijklmnopqrstuv';
+    final requests = <Uri>[];
+    final client = RssClient(
+      client: MockClient((request) async {
+        requests.add(request.url);
+        return http.Response(
+          '<feed xmlns="http://www.w3.org/2005/Atom"><title>Channel</title>'
+          '<entry><id>video-1</id><title>Video</title></entry></feed>',
+          200,
+        );
+      }),
+    );
+
+    final result = await client.fetch('https://youtube.com/channel/$channelId');
+    final feed = RssParser().parse(result.body!);
+    expect(requests.single.host, 'www.youtube.com');
+    expect(requests.single.path, '/feeds/videos.xml');
+    expect(requests.single.queryParameters['channel_id'], channelId);
+    expect(feed.items.single.guid, 'video-1');
+  });
+
+  test('resolves YouTube handle pages before fetching Atom', () async {
+    const channelId = 'UCabcdefghijklmnopqrstuv';
+    final requests = <Uri>[];
+    final client = RssClient(
+      client: MockClient((request) async {
+        requests.add(request.url);
+        if (request.url.path.startsWith('/@')) {
+          return http.Response(
+          '<script>{"externalId":"$channelId"}</script>',
+            200,
+          );
+        }
+        return http.Response('<feed><title>Channel</title></feed>', 200);
+      }),
+    );
+
+    final result = await client.fetch('https://www.youtube.com/@wepseed');
+    expect(requests, hasLength(2));
+    expect(result.resolvedUrl, contains('feeds/videos.xml'));
+    expect(RssParser().parse(result.body!).title, 'Channel');
+  });
+
+  test('stores the canonical YouTube URL and does not add it twice', () async {
+    const channelId = 'UCabcdefghijklmnopqrstuv';
+    final db = AppDatabase(NativeDatabase.memory());
+    final repo = DriftFeedRepository(
+      db,
+      client: RssClient(
+        client: MockClient(
+          (_) async => http.Response(
+            '<feed xmlns="http://www.w3.org/2005/Atom"><title>Channel</title></feed>',
+            200,
+          ),
+        ),
+      ),
+    );
+    final input = 'https://youtube.com/channel/$channelId';
+
+    await repo.addFeed(input);
+    await repo.addFeed(input);
+
+    final rows = await db.select(db.feeds).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.url, contains('feeds/videos.xml'));
+    await db.close();
+  });
+
+  test(
+    'clears stale validators after a successful refresh without them',
+    () async {
+      var call = 0;
+      final db = AppDatabase(NativeDatabase.memory());
+      final repo = DriftFeedRepository(
+        db,
+        client: RssClient(
+          client: MockClient((_) async {
+            call++;
+            return http.Response(
+              '<rss><channel><title>Feed</title></channel></rss>',
+              200,
+              headers: call == 1
+                  ? {
+                      'etag': '"old"',
+                      'last-modified': 'Wed, 01 Jan 2025 00:00:00 GMT',
+                    }
+                  : const {},
+            );
+          }),
+        ),
+      );
+
+      await repo.addFeed('https://example.test/feed');
+      final id = (await db.select(db.feeds).getSingle()).id;
+      await repo.refreshFeed(id);
+
+      final refreshed = await db.select(db.feeds).getSingle();
+      expect(refreshed.etag, isNull);
+      expect(refreshed.lastModified, isNull);
+      await db.close();
+    },
+  );
 }
