@@ -82,7 +82,7 @@ jobs:
           echo "build_number=$CODE" >> "$GITHUB_OUTPUT"
           echo "Building $NAME+$CODE (tag $TAG)"
 
-      # Prefer Google / Maven Central (see android/* repository order). Aliyun is fallback only.
+      # Official Google / Maven Central / storage.googleapis.com only (no Aliyun).
       - name: Build per-ABI release APKs
         env:
           GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"

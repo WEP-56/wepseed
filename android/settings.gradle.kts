@@ -11,15 +11,11 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
-        // Official first — GitHub Actions / global CI must not depend on Aliyun.
+        // Official only for CI (GitHub Actions). Aliyun 502s disable later
+        // repositories and break flutter_embedding_* resolution.
         google()
         mavenCentral()
         gradlePluginPortal()
-        // Optional China mirrors (fallback only).
-        maven { url = uri("https://maven.aliyun.com/repository/google") }
-        maven { url = uri("https://maven.aliyun.com/repository/central") }
-        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
-        maven { url = uri("https://maven.aliyun.com/repository/public") }
     }
 }
 
@@ -28,9 +24,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url = uri("https://maven.aliyun.com/repository/google") }
-        maven { url = uri("https://maven.aliyun.com/repository/central") }
-        maven { url = uri("https://maven.aliyun.com/repository/public") }
+        // Flutter engine / embedding AARs (not on Maven Central).
+        maven { url = uri("https://storage.googleapis.com/download.flutter.io") }
     }
 }
 

@@ -1,11 +1,11 @@
 allprojects {
     repositories {
-        // Official first so CI is not blocked by Aliyun 502s.
+        // Official only — do not list Aliyun here. A 502 from a mirror can
+        // poison resolution ("repository disabled due to earlier error") and
+        // prevent download of io.flutter:* from storage.googleapis.com.
         google()
         mavenCentral()
-        maven { url = uri("https://maven.aliyun.com/repository/google") }
-        maven { url = uri("https://maven.aliyun.com/repository/central") }
-        maven { url = uri("https://maven.aliyun.com/repository/public") }
+        maven { url = uri("https://storage.googleapis.com/download.flutter.io") }
     }
 }
 

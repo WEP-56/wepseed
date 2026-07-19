@@ -1,11 +1,17 @@
-// Optional init script (only if applied with --init-script).
-// Prefer official Maven; keep Aliyun as last-resort mirrors for China networks.
+// Optional China network init script — NOT used by CI.
+// Local only: flutter build apk -- --init-script android/init.gradle
+// Prefer official first; Aliyun is last-resort fallback.
+//
+// Warning: if Aliyun returns 502, Gradle may disable subsequent repos —
+// only use when official mirrors are unreachable.
+
 settingsEvaluated { settings ->
     settings.pluginManagement.repositories.clear()
     settings.pluginManagement.repositories {
         google()
         mavenCentral()
         gradlePluginPortal()
+        maven { url 'https://storage.googleapis.com/download.flutter.io' }
         maven { url 'https://maven.aliyun.com/repository/google' }
         maven { url 'https://maven.aliyun.com/repository/central' }
         maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
@@ -18,6 +24,7 @@ allprojects {
         repositories {
             google()
             mavenCentral()
+            maven { url 'https://storage.googleapis.com/download.flutter.io' }
             maven { url 'https://maven.aliyun.com/repository/google' }
             maven { url 'https://maven.aliyun.com/repository/central' }
             maven { url 'https://maven.aliyun.com/repository/public' }
@@ -27,6 +34,7 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://storage.googleapis.com/download.flutter.io' }
         maven { url 'https://maven.aliyun.com/repository/google' }
         maven { url 'https://maven.aliyun.com/repository/central' }
         maven { url 'https://maven.aliyun.com/repository/public' }
