@@ -79,6 +79,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
         useMockFeed: Value(settings.useMockFeed),
         commentTrigger: Value(commentTriggerToDb(settings.commentTrigger)),
         feedFilterJson: Value(feedFilterToDb(settings.feedFilter)),
+        browserIncognito: Value(settings.browserIncognito),
         updatedAt: Value(DateTime.now()),
       ),
     );
@@ -125,6 +126,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       useMockFeed: row.useMockFeed,
       commentTrigger: commentTriggerFromDb(row.commentTrigger),
       feedFilter: feedFilterFromDb(row.feedFilterJson),
+      browserIncognito: row.browserIncognito,
     );
   }
 

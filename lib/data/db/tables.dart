@@ -163,6 +163,11 @@ class AppSettingsRows extends Table {
 
   /// New-page stream filter JSON: {onlyToday, onlyUnread, feedIds}.
   TextColumn get feedFilterJson => text().withDefault(const Constant('{}'))();
+
+  /// In-app browser: clear cookies when leaving the page (no login persist).
+  BoolColumn get browserIncognito =>
+      boolean().withDefault(const Constant(false))();
+
   DateTimeColumn get updatedAt => dateTime()();
 
   @override

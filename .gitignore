@@ -55,6 +55,7 @@ docs/_secrets_scratch.txt
 docs/_routes_raw.json
 docs/_radar_extract.json
 **/wepseed-keystore.b64
+example
 
 # Local Claude / IDE noise
 .claude/settings.local.json

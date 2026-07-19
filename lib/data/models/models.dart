@@ -401,6 +401,7 @@ class AppSettings {
     this.useMockFeed = true,
     this.commentTrigger = CommentTrigger.onOpenComments,
     this.feedFilter = const FeedFilter(),
+    this.browserIncognito = false,
   });
 
   final ThemeMode themeMode;
@@ -412,6 +413,9 @@ class AppSettings {
   final CommentTrigger commentTrigger;
   final FeedFilter feedFilter;
 
+  /// In-app browser: do not persist cookies / login after the page closes.
+  final bool browserIncognito;
+
   AppSettings copyWith({
     ThemeMode? themeMode,
     double? fontScale,
@@ -421,6 +425,7 @@ class AppSettings {
     bool? useMockFeed,
     CommentTrigger? commentTrigger,
     FeedFilter? feedFilter,
+    bool? browserIncognito,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -431,6 +436,7 @@ class AppSettings {
       useMockFeed: useMockFeed ?? this.useMockFeed,
       commentTrigger: commentTrigger ?? this.commentTrigger,
       feedFilter: feedFilter ?? this.feedFilter,
+      browserIncognito: browserIncognito ?? this.browserIncognito,
     );
   }
 }

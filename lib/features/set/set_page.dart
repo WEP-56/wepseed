@@ -12,8 +12,13 @@ import '../../core/theme/app_colors.dart';
 import '../../core/ui/app_toast.dart';
 import '../../core/utils/monogram.dart';
 import '../../core/utils/open_url.dart';
+import '../../data/browser/cache_service.dart';
 import '../../data/models/models.dart';
 import '../../data/update/github_update_service.dart';
+import '../../features/browser/download_list_page.dart';
+import '../../features/browser/web_library_pages.dart';
+import '../../providers/browser_library_provider.dart';
+import '../../providers/download_provider.dart';
 import '../../providers/feed_providers.dart';
 import '../../providers/radar_providers.dart';
 import '../../providers/settings_provider.dart';
@@ -135,6 +140,40 @@ class SetPage extends ConsumerWidget {
               onToast: (msg) => showAppToast(msg, context: context),
             ),
             _Section(
+              title: 'Browser',
+              children: [
+                _NavTile(
+                  icon: Icons.star_outline_rounded,
+                  title: '网页收藏',
+                  subtitle: _bookmarksSubtitle(ref),
+                  onTap: () => WebBookmarksPage.open(context),
+                ),
+                _NavTile(
+                  icon: Icons.history_rounded,
+                  title: '浏览历史',
+                  subtitle: _historySubtitle(ref),
+                  onTap: () => WebHistoryPage.open(context),
+                ),
+                _NavTile(
+                  icon: Icons.download_outlined,
+                  title: '下载管理',
+                  subtitle: _downloadsSubtitle(ref),
+                  onTap: () => DownloadListPage.open(context),
+                ),
+                _SwitchTile(
+                  icon: Icons.visibility_off_outlined,
+                  title: '无痕模式',
+                  subtitle: '不记历史；关页时清 Cookie / 登录态',
+                  value: settings.browserIncognito,
+                  onChanged: (v) {
+                    controller.updateSettings(
+                      settings.copyWith(browserIncognito: v),
+                    );
+                  },
+                ),
+              ],
+            ),
+            _Section(
               title: 'DATA',
               children: [
                 _SwitchTile(
@@ -169,8 +208,8 @@ class SetPage extends ConsumerWidget {
                 _NavTile(
                   icon: Icons.cleaning_services_outlined,
                   title: '清理缓存',
-                  subtitle: '图片与临时文件',
-                  onTap: () => showAppToast('缓存已清理（模拟）', context: context),
+                  subtitle: '图片、临时文件与 WebView 缓存',
+                  onTap: () => _openClearCache(context),
                 ),
                 _NavTile(
                   icon: Icons.ios_share_rounded,
@@ -193,13 +232,21 @@ class SetPage extends ConsumerWidget {
                   icon: Icons.description_outlined,
                   title: '用户协议',
                   subtitle: '在 GitHub 查看',
-                  onTap: () => openExternalUrl(kTermsUrl),
+                  onTap: () => openUrl(
+                    kTermsUrl,
+                    context: context,
+                    title: '用户协议',
+                  ),
                 ),
                 _NavTile(
                   icon: Icons.privacy_tip_outlined,
                   title: '隐私政策',
                   subtitle: '在 GitHub 查看',
-                  onTap: () => openExternalUrl(kPrivacyUrl),
+                  onTap: () => openUrl(
+                    kPrivacyUrl,
+                    context: context,
+                    title: '隐私政策',
+                  ),
                 ),
                 _NavTile(
                   icon: Icons.info_outline_rounded,
@@ -238,6 +285,76 @@ class SetPage extends ConsumerWidget {
     if (feeds == null) return '加载中…';
     if (feeds.isEmpty) return '尚未添加';
     return '${feeds.length} 个源';
+  }
+
+  String _downloadsSubtitle(WidgetRef ref) {
+    final items = ref.watch(downloadListProvider);
+    if (items.isEmpty) return '查看与管理下载文件';
+    final active =
+        items.where((e) => e.status == DownloadStatus.downloading).length;
+    if (active > 0) return '$active 个进行中 · 共 ${items.length} 条';
+    return '${items.length} 条记录';
+  }
+
+  String _bookmarksSubtitle(WidgetRef ref) {
+    final n = ref.watch(webBookmarkProvider).length;
+    if (n == 0) return '收藏的网页';
+    return '$n 个收藏';
+  }
+
+  String _historySubtitle(WidgetRef ref) {
+    final n = ref.watch(webHistoryProvider).length;
+    if (n == 0) return '最近访问的网页';
+    return '$n 条记录';
+  }
+
+  Future<void> _openClearCache(BuildContext context) async {
+    final sizeFuture = CacheService.instance.measureLabel();
+    if (!context.mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return FutureBuilder<String>(
+          future: sizeFuture,
+          builder: (ctx, snap) {
+            final sizeLabel = snap.hasData ? snap.data! : '计算中…';
+            return AlertDialog(
+              title: const Text('清理缓存'),
+              content: Text(
+                '将清除图片缓存、临时文件与 WebView 缓存。\n'
+                '当前约 $sizeLabel。\n\n'
+                '不会删除订阅、收藏、下载文件或 API Key。',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: snap.hasData ? () => Navigator.pop(ctx, true) : null,
+                  child: const Text('清理'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    showAppToast('正在清理…', context: context);
+    try {
+      await CacheService.instance.clearAll();
+      if (context.mounted) {
+        showAppToast('缓存已清理', context: context);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showAppToast('清理失败：$e', context: context);
+      }
+    }
   }
 
   Future<void> _openAddFeed(BuildContext context, WidgetRef ref) async {
@@ -701,7 +818,11 @@ class SetPage extends ConsumerWidget {
               const SizedBox(height: 18),
               _PrimaryButton(
                 label: 'GitHub 仓库',
-                onTap: () => openExternalUrl(kGithubHome),
+                onTap: () => openUrl(
+                  kGithubHome,
+                  context: context,
+                  title: 'WEPSEED',
+                ),
               ),
               const SizedBox(height: 8),
               TextButton(
@@ -767,7 +888,11 @@ class _UpdateSheetState extends State<_UpdateSheet> {
     if (latest == null) return;
     final asset = _service.pickApkAsset(latest);
     if (asset == null) {
-      await openExternalUrl(latest.htmlUrl);
+      await openUrl(
+        latest.htmlUrl,
+        context: context,
+        title: 'Release',
+      );
       return;
     }
 
@@ -801,7 +926,11 @@ class _UpdateSheetState extends State<_UpdateSheet> {
               duration: const Duration(seconds: 3),
             );
           }
-          await openExternalUrl(asset.downloadUrl);
+          // APK binary: system browser (download manager / store).
+          await openUrl(
+            asset.downloadUrl,
+            mode: UrlOpenMode.system,
+          );
           return;
         }
       }
@@ -814,7 +943,7 @@ class _UpdateSheetState extends State<_UpdateSheet> {
       if (!mounted) return;
       if (openResult.type != ResultType.done) {
         showAppToast('无法打开安装器：${openResult.message}', context: context);
-        await openExternalUrl(asset.downloadUrl);
+        await openUrl(asset.downloadUrl, mode: UrlOpenMode.system);
       } else {
         showAppToast('请按系统提示完成安装', context: context);
       }
@@ -823,7 +952,7 @@ class _UpdateSheetState extends State<_UpdateSheet> {
         showAppToast('下载失败：$e', context: context);
         final url =
             _service.pickApkAsset(latest)?.downloadUrl ?? latest.htmlUrl;
-        await openExternalUrl(url);
+        await openUrl(url, mode: UrlOpenMode.system);
       }
     } finally {
       if (mounted) {
@@ -865,7 +994,11 @@ class _UpdateSheetState extends State<_UpdateSheet> {
             _PrimaryButton(label: '重试', onTap: _check),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => openExternalUrl(kGithubReleases),
+              onPressed: () => openUrl(
+                kGithubReleases,
+                context: context,
+                title: 'Releases',
+              ),
               child: const Text('在浏览器打开 Releases'),
             ),
           ] else if (_result != null && !_result!.hasUpdate) ...[
@@ -910,7 +1043,11 @@ class _UpdateSheetState extends State<_UpdateSheet> {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => openExternalUrl(_result!.latest!.htmlUrl),
+              onPressed: () => openUrl(
+                _result!.latest!.htmlUrl,
+                context: context,
+                title: 'Release',
+              ),
               child: const Text('在浏览器打开 Release'),
             ),
           ],

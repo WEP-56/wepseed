@@ -121,7 +121,11 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
     final url = article.link?.trim().isNotEmpty == true
         ? article.link
         : article.source.siteUrl;
-    final ok = await openExternalUrl(url);
+    final ok = await openUrl(
+      url,
+      context: context,
+      title: article.title,
+    );
     if (!ok && mounted) {
       showAppToast('没有可打开的原文链接', context: context);
     }
@@ -138,7 +142,11 @@ class _ArticleDetailPageState extends ConsumerState<ArticleDetailPage> {
   }
 
   Future<void> _openMediaExternal(Article article) async {
-    final ok = await openExternalUrl(article.enclosureUrl ?? article.link);
+    final ok = await openUrl(
+      article.enclosureUrl ?? article.link,
+      context: context,
+      title: article.title,
+    );
     if (!ok && mounted) showAppToast('没有可打开的媒体链接', context: context);
   }
 

@@ -47,7 +47,7 @@ class ArticleBody extends StatelessWidget {
       return Html(
         data: html,
         onLinkTap: (url, _, _) {
-          openExternalUrl(url);
+          openUrl(url, context: context);
         },
         extensions: [
           TagExtension(

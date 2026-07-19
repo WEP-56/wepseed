@@ -4445,6 +4445,21 @@ class $AppSettingsRowsTable extends AppSettingsRows
     requiredDuringInsert: false,
     defaultValue: const Constant('{}'),
   );
+  static const VerificationMeta _browserIncognitoMeta = const VerificationMeta(
+    'browserIncognito',
+  );
+  @override
+  late final GeneratedColumn<bool> browserIncognito = GeneratedColumn<bool>(
+    'browser_incognito',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("browser_incognito" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -4469,6 +4484,7 @@ class $AppSettingsRowsTable extends AppSettingsRows
     useMockFeed,
     commentTrigger,
     feedFilterJson,
+    browserIncognito,
     updatedAt,
   ];
   @override
@@ -4566,6 +4582,15 @@ class $AppSettingsRowsTable extends AppSettingsRows
         ),
       );
     }
+    if (data.containsKey('browser_incognito')) {
+      context.handle(
+        _browserIncognitoMeta,
+        browserIncognito.isAcceptableOrUnknown(
+          data['browser_incognito']!,
+          _browserIncognitoMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -4627,6 +4652,10 @@ class $AppSettingsRowsTable extends AppSettingsRows
         DriftSqlType.string,
         data['${effectivePrefix}feed_filter_json'],
       )!,
+      browserIncognito: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}browser_incognito'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -4654,6 +4683,9 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
 
   /// New-page stream filter JSON: {onlyToday, onlyUnread, feedIds}.
   final String feedFilterJson;
+
+  /// In-app browser: clear cookies when leaving the page (no login persist).
+  final bool browserIncognito;
   final DateTime updatedAt;
   const AppSettingsRow({
     required this.id,
@@ -4667,6 +4699,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
     required this.useMockFeed,
     required this.commentTrigger,
     required this.feedFilterJson,
+    required this.browserIncognito,
     required this.updatedAt,
   });
   @override
@@ -4683,6 +4716,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
     map['use_mock_feed'] = Variable<bool>(useMockFeed);
     map['comment_trigger'] = Variable<String>(commentTrigger);
     map['feed_filter_json'] = Variable<String>(feedFilterJson);
+    map['browser_incognito'] = Variable<bool>(browserIncognito);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -4700,6 +4734,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
       useMockFeed: Value(useMockFeed),
       commentTrigger: Value(commentTrigger),
       feedFilterJson: Value(feedFilterJson),
+      browserIncognito: Value(browserIncognito),
       updatedAt: Value(updatedAt),
     );
   }
@@ -4723,6 +4758,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
       useMockFeed: serializer.fromJson<bool>(json['useMockFeed']),
       commentTrigger: serializer.fromJson<String>(json['commentTrigger']),
       feedFilterJson: serializer.fromJson<String>(json['feedFilterJson']),
+      browserIncognito: serializer.fromJson<bool>(json['browserIncognito']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -4741,6 +4777,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
       'useMockFeed': serializer.toJson<bool>(useMockFeed),
       'commentTrigger': serializer.toJson<String>(commentTrigger),
       'feedFilterJson': serializer.toJson<String>(feedFilterJson),
+      'browserIncognito': serializer.toJson<bool>(browserIncognito),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -4757,6 +4794,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
     bool? useMockFeed,
     String? commentTrigger,
     String? feedFilterJson,
+    bool? browserIncognito,
     DateTime? updatedAt,
   }) => AppSettingsRow(
     id: id ?? this.id,
@@ -4770,6 +4808,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
     useMockFeed: useMockFeed ?? this.useMockFeed,
     commentTrigger: commentTrigger ?? this.commentTrigger,
     feedFilterJson: feedFilterJson ?? this.feedFilterJson,
+    browserIncognito: browserIncognito ?? this.browserIncognito,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   AppSettingsRow copyWithCompanion(AppSettingsRowsCompanion data) {
@@ -4797,6 +4836,9 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
       feedFilterJson: data.feedFilterJson.present
           ? data.feedFilterJson.value
           : this.feedFilterJson,
+      browserIncognito: data.browserIncognito.present
+          ? data.browserIncognito.value
+          : this.browserIncognito,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -4815,6 +4857,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
           ..write('useMockFeed: $useMockFeed, ')
           ..write('commentTrigger: $commentTrigger, ')
           ..write('feedFilterJson: $feedFilterJson, ')
+          ..write('browserIncognito: $browserIncognito, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -4833,6 +4876,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
     useMockFeed,
     commentTrigger,
     feedFilterJson,
+    browserIncognito,
     updatedAt,
   );
   @override
@@ -4850,6 +4894,7 @@ class AppSettingsRow extends DataClass implements Insertable<AppSettingsRow> {
           other.useMockFeed == this.useMockFeed &&
           other.commentTrigger == this.commentTrigger &&
           other.feedFilterJson == this.feedFilterJson &&
+          other.browserIncognito == this.browserIncognito &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -4865,6 +4910,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
   final Value<bool> useMockFeed;
   final Value<String> commentTrigger;
   final Value<String> feedFilterJson;
+  final Value<bool> browserIncognito;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const AppSettingsRowsCompanion({
@@ -4879,6 +4925,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
     this.useMockFeed = const Value.absent(),
     this.commentTrigger = const Value.absent(),
     this.feedFilterJson = const Value.absent(),
+    this.browserIncognito = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4894,6 +4941,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
     this.useMockFeed = const Value.absent(),
     this.commentTrigger = const Value.absent(),
     this.feedFilterJson = const Value.absent(),
+    this.browserIncognito = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -4910,6 +4958,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
     Expression<bool>? useMockFeed,
     Expression<String>? commentTrigger,
     Expression<String>? feedFilterJson,
+    Expression<bool>? browserIncognito,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -4926,6 +4975,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
       if (useMockFeed != null) 'use_mock_feed': useMockFeed,
       if (commentTrigger != null) 'comment_trigger': commentTrigger,
       if (feedFilterJson != null) 'feed_filter_json': feedFilterJson,
+      if (browserIncognito != null) 'browser_incognito': browserIncognito,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4943,6 +4993,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
     Value<bool>? useMockFeed,
     Value<String>? commentTrigger,
     Value<String>? feedFilterJson,
+    Value<bool>? browserIncognito,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -4958,6 +5009,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
       useMockFeed: useMockFeed ?? this.useMockFeed,
       commentTrigger: commentTrigger ?? this.commentTrigger,
       feedFilterJson: feedFilterJson ?? this.feedFilterJson,
+      browserIncognito: browserIncognito ?? this.browserIncognito,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -4999,6 +5051,9 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
     if (feedFilterJson.present) {
       map['feed_filter_json'] = Variable<String>(feedFilterJson.value);
     }
+    if (browserIncognito.present) {
+      map['browser_incognito'] = Variable<bool>(browserIncognito.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -5022,6 +5077,7 @@ class AppSettingsRowsCompanion extends UpdateCompanion<AppSettingsRow> {
           ..write('useMockFeed: $useMockFeed, ')
           ..write('commentTrigger: $commentTrigger, ')
           ..write('feedFilterJson: $feedFilterJson, ')
+          ..write('browserIncognito: $browserIncognito, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -11209,6 +11265,7 @@ typedef $$AppSettingsRowsTableCreateCompanionBuilder =
       Value<bool> useMockFeed,
       Value<String> commentTrigger,
       Value<String> feedFilterJson,
+      Value<bool> browserIncognito,
       required DateTime updatedAt,
       Value<int> rowid,
     });
@@ -11225,6 +11282,7 @@ typedef $$AppSettingsRowsTableUpdateCompanionBuilder =
       Value<bool> useMockFeed,
       Value<String> commentTrigger,
       Value<String> feedFilterJson,
+      Value<bool> browserIncognito,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -11290,6 +11348,11 @@ class $$AppSettingsRowsTableFilterComposer
 
   ColumnFilters<String> get feedFilterJson => $composableBuilder(
     column: $table.feedFilterJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get browserIncognito => $composableBuilder(
+    column: $table.browserIncognito,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11363,6 +11426,11 @@ class $$AppSettingsRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get browserIncognito => $composableBuilder(
+    column: $table.browserIncognito,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -11423,6 +11491,11 @@ class $$AppSettingsRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get browserIncognito => $composableBuilder(
+    column: $table.browserIncognito,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
@@ -11475,6 +11548,7 @@ class $$AppSettingsRowsTableTableManager
                 Value<bool> useMockFeed = const Value.absent(),
                 Value<String> commentTrigger = const Value.absent(),
                 Value<String> feedFilterJson = const Value.absent(),
+                Value<bool> browserIncognito = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AppSettingsRowsCompanion(
@@ -11489,6 +11563,7 @@ class $$AppSettingsRowsTableTableManager
                 useMockFeed: useMockFeed,
                 commentTrigger: commentTrigger,
                 feedFilterJson: feedFilterJson,
+                browserIncognito: browserIncognito,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -11505,6 +11580,7 @@ class $$AppSettingsRowsTableTableManager
                 Value<bool> useMockFeed = const Value.absent(),
                 Value<String> commentTrigger = const Value.absent(),
                 Value<String> feedFilterJson = const Value.absent(),
+                Value<bool> browserIncognito = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => AppSettingsRowsCompanion.insert(
@@ -11519,6 +11595,7 @@ class $$AppSettingsRowsTableTableManager
                 useMockFeed: useMockFeed,
                 commentTrigger: commentTrigger,
                 feedFilterJson: feedFilterJson,
+                browserIncognito: browserIncognito,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

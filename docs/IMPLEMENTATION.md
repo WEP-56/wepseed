@@ -1,8 +1,8 @@
 # WEPSEED 功能实现文档
 
-> 版本：**0.0.8**（tag `v0.0.8` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
+> 版本：**0.0.9**（tag `v0.0.9` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
 > 平台：Flutter · Android 首发 · 本地优先（local-only）  
-> 状态：**0.0.8 功能真机 OK**；Explore UI 已改为横向步骤+抽屉；图标改为干净黑底白标  
+> 状态：**0.0.9** 应用内浏览器（外链 / 下载 / 收藏 / 历史 / 无痕 / 清理缓存）；模拟器 OK，**待真机**  
 > 开关：`kUseMockFeed` / `kUseMockComments`（`lib/core/config/app_flags.dart`）
 
 本文档只写**要做什么、做成什么样、怎么落地**。  
@@ -29,7 +29,7 @@
 |------|------|------|
 | 订阅 | 添加源、OPML 导入/导出、刷新 | **已接真**（Set + 源页） |
 | 刷 | New masonry 流 + 源主页 | **真 Stream + 下拉刷新**（时间轨已移除；**筛选已接**） |
-| 读 | 详情正文、已读、收藏 | **HTML 正文 + 图缓存 + 目录 scrubber**；外链系统浏览器 |
+| 读 | 详情正文、已读、收藏 | **HTML 正文 + 图缓存 + 目录 scrubber**；外链 **应用内 WebView**（可转系统浏览器） |
 | 播 | RSS 音频 / 视频 | **文章级媒体识别 + 沉浸详情播放器 + 全局 mini + 音频后台通知 + 视频全屏 / Android PiP** |
 | 评 | TikTok 式评论区 + 多网友 | **真 LLM**；无 Key 不灌 mock；**去 think/tool 清洗**（0.0.4 真机通过）；**D-task 已验收**（`comment_jobs` + one-off WM） |
 | 回看 | ME 时间轴 | **Drift**；三 stat → 列表 CRUD（收藏/对话/痕迹，0.0.4 真机通过） |
@@ -101,7 +101,8 @@ test/
 | 中 | **内容拉取稳定性余项**：偶发失败分层定位（请求/跳转/解析/upsert/UI Stream） |
 | 低 | 媒体 M3：进度持久化、下载缓存 |
 | 中 | E-ROM 长期：极端省电/多 ROM 文档与验收可继续补 |
-| 低 | 评论流式气泡；应用内 WebView（§15.6） |
+| 低 | 评论流式气泡 |
+| 中 | 应用内 WebView **M1/M2**（历史/书签/下载 · §15.6） |
 | 基建 | CI Actions Node 20 弃用告警可择机升 action 大版本 |
 
 ### 1.4 关键接线（勿重造）
@@ -114,7 +115,7 @@ test/
 | Feed URL | 以 `fetch.resolvedUrl`（YouTube 规范 Atom 等）入库 / 去重 | 勿用页面 URL 与 Atom URL 各订一次 |
 | RSS 体编码 | `_decodeXmlBody`：header charset / XML 声明 / UTF-8 / latin1 | 勿假设 `response.body` 默认 charset |
 | 条件缓存 | 200 时 `etag`/`lastModified` 以响应为准（可 null 清除） | 避免服务端停发 validator 后误 304 |
-| 外链 | `openExternalUrl` → 系统浏览器 | WebView 见 §15.6 |
+| 外链 | `openUrl` → 默认 **inApp** WebView；APK 等 `UrlOpenMode.system` | `lib/features/browser/` · §15.6 |
 | Scrubber | `EdgeScrubber` | **仅详情** h1–h3；New **不挂**时间轨 |
 | LLM | `http_llm_client` + `scheduled_llm_client` + **`llm_text_sanitize`** | 重试 `_postJson`；测连绕过 scheduler；入库前清洗 think/tool |
 | Toast | `lib/core/ui/app_toast.dart` + `appMessengerKey` | 勿再裸 `SnackBar` 贴底 |
@@ -762,14 +763,14 @@ Item: pending → running → succeeded | skipped | failed
 - [x] 内联脏样式清洗 `sanitizeArticleHtml`（去 color/opacity）  
 - [x] 深色正文对比度（近白正文 + 提亮 secondary/tertiary）  
 - [x] 图片缓存 `cached_network_image`（列表/精选/封面/正文 img）  
-- [x] 外链：`url_launcher` **系统浏览器**（`openExternalUrl`）  
+- [x] 外链：`openUrl` 默认 **应用内 WebView**（`flutter_inappwebview`）；菜单可转系统浏览器  
 - [x] 复制链接 / 分享 / 导出 Markdown  
 - [x] dwell ≥180s → WarmEvent（每文每天最多 1 次；Drift 持久化）  
 - [x] **EdgeScrubber**：详情 h1–h3 目录跳转（New 时间轨已产品决策移除）  
   - 左侧中部细横杠；拖动当前杠变长变深；右侧浮层标题  
   - 右滑超过约 56px →「松开取消」  
   - 至少 2 个锚点才显示  
-- [ ] 应用内 WebView（cookies / 下载）→ **Phase F，见 §15.6** 
+- [x] 应用内 WebView **M0**（打开原文 / 正文链接 / 关闭·后退·复制·外开）→ **M1/M2 见 §15.6** 
 
 ### Phase D — 真 LLM ⚠ **主路径已接，体验未收口**
 
@@ -808,7 +809,7 @@ Item: pending → running → succeeded | skipped | failed
 - [x] New 筛选（真机通过）  
 - [x] 测试：LLM · sanitize · feed_filter · semver · background 常量  
 - [ ] 性能 / 错误空态补强  
-- [ ] **应用内 WebView**（§15.6）  
+- [x] **应用内 WebView M0**（§15.6）；M1/M2 余  
 
 > 下一会话：可选 **D-task** / 流式 / WebView。
 
@@ -907,9 +908,10 @@ UI 只依赖接口；**Phase B 新增 `DriftFeedRepository` / `DriftArticleRepos
 - [x] 多网友 + 评论触发 + **真 LLM 评论**  
 - [x] 真 RSS + New/源/详情真数据  
 - [x] 已读 / 收藏持久化；OPML；空态；下拉刷新  
-- [x] HTML 正文 / 图缓存 / 系统浏览器外链 / 分享复制  
+- [x] HTML 正文 / 图缓存 / 外链 / 分享复制  
 - [x] EdgeScrubber（**仅详情**目录；New 无时间轨）  
 - [x] 深色正文对比度  
+- [x] 应用内 WebView M0（`InAppBrowserPage` + `openUrl`）  
 
 ### 更后 / 0.0.3–0.0.4
 
@@ -920,7 +922,7 @@ UI 只依赖接口；**Phase B 新增 `DriftFeedRepository` / `DriftArticleRepos
 - [x] 通知深链返回栈 + New 筛选（0.0.3；**真机通过**）  
 - [x] 评论 think/tool 清洗（0.0.4；**真机通过**）  
 - [x] **D-task** 评论任务持久化 + WM 恢复（**0.0.6 真机通过**）  
-- [ ] 应用内 WebView（F 余）  
+- [ ] 应用内 WebView M1/M2（历史 / 书签 / 下载）  
 - [x] P1 媒体类型 + 音视频播放器 + 全局 mini + 媒体专属 LLM 对话窗（**0.0.6 真机通过**）
 
 ---
@@ -955,16 +957,17 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.1 一句话
 
-**`v0.0.8`：Explore 雷达功能真机通过；UI 已收成横向步骤条 + 底部抽屉选择（对齐 Set）；启动图标改为干净黑底白标（去炫光）。下一会话可做体验打磨余项或其它 backlog。**
+**`v0.0.9`：应用内浏览器完整切片（打开原文、深链确认、下载/收藏/历史、无痕、清理缓存）。模拟器验收 OK；发 tag 供真机测。**
 
 ### 15.2 现状速查
 
 | 模块 | 路径 / 要点 |
 |------|-------------|
-| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.8`** |
+| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.9`** |
 | Flag | `kUseMockFeed=false`；`kUseMockComments=false` |
-| 版本 | `pubspec` `0.0.8+8` |
-| Drift | **schemaVersion = 7**；评论任务表 + articles 媒体字段 + media_chat_messages |
+| 版本 | `pubspec` `0.0.9+9` |
+| Drift | **schemaVersion = 8**；+ `browserIncognito`；媒体/评论任务同前 |
+| 浏览器 | `lib/features/browser/` · `openUrl` 默认 inApp · Set Browser 区 |
 | 评论清洗 | `lib/data/llm/llm_text_sanitize.dart` · complete 后 + 入库前 |
 | 评论任务 | `lib/data/comments/comment_generation_engine.dart` · `comment_job_repository*` · `comment_job_worker.dart` |
 | ME 列表 | `/me/bookmarks` · `/me/chats` · `/me/traces` · `me_list_page.dart` |
@@ -987,7 +990,7 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 1. **Explore 体验余项（可选）**：步骤记忆进草稿、来源网格/热度排序、自定义实例测 healthz、空态引导去添加  
 2. **拉取稳定性**：公网 RSSHub 实例失败的用户文案与换实例提示  
-3. **媒体 M3 / WebView / E-ROM**（见 §15.6）  
+3. **WebView M1/M2** 或 媒体 M3 / E-ROM（见 §15.6）  
 4. 勿默认再抬版本，除非有可发版增量  
 
 ### 15.4 不要做的事
@@ -995,8 +998,9 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 - 恢复 New 左侧时间轨（除非产品改口）  
 - 通知深链改回 `router.go`  
 - 无必要重写 masonry / 玻璃  
-- 应用内 WebView（未明确开工前）  
 - 大改 RSS 解析（除非源坏了）；YouTube 已走官方 Atom，勿改回硬爬 HTML 列表  
+- 把 fluxdo Discourse Cookie/CF 同步整包搬进 WEPSEED  
+ 
 - 条件请求时对 YouTube **频道页** 带旧 ETag（304 无 body 抽不出 channel id）  
 - 200 成功却「保留旧 etag/lastModified」当响应未返回时  
 - Explore 退回 **DropdownButton** 填表风（应继续用 sheet + 步骤）  
@@ -1015,21 +1019,34 @@ flutter pub get
 flutter analyze
 flutter test
 flutter run -d <device>
-# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.8
-# 首选 wepseed-0.0.8-arm64-v8a.apk
+# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.9
+# 首选 wepseed-0.0.9-arm64-v8a.apk
 ```
 
-### 15.6 Backlog：应用内 WebView 阅读器（Phase F 余）
+### 15.6 应用内 WebView 阅读器（Phase F · **0.0.9**）
 
-**产品诉求（已确认）：** 外链优先应用内 WebView，可存 cookies、管理下载；成本高，**现阶段一律系统浏览器**。
+**产品诉求：** 外链优先应用内 WebView；下载 / 收藏 / 历史 / 无痕 / 清理缓存。
 
 | 项 | 说明 |
 |----|------|
-| 包选型 | `webview_flutter` 或 `flutter_inappwebview` |
-| 替换点 | `openExternalUrl` / `openArticleUrl(mode: inApp \| system)` |
-| 风险 | 桌面 UA；隐私文案已部分在 `PRIVACY.md` |
+| 包 | `flutter_inappwebview: 6.1.5` |
+| 页面 | `lib/features/browser/in_app_browser_page.dart` + download / library 页 |
+| 入口 | `lib/core/utils/open_url.dart` → `openUrl` / `UrlOpenMode.inApp\|system` |
+| 接线 | 详情原文 / 正文链接 / Set 协议隐私 GitHub；**APK 仍 system** |
+| 设置 | Set · Browser：收藏 / 历史 / 下载 / 无痕；DATA · 清理缓存 |
+| 参考 | `example/fluxdo/`（gitignored 对照） |
 
-未实现前：**`LaunchMode.externalApplication` only**。
+**已实现（模拟器 OK · 待真机）：**
+
+- [x] inApp 打开 http(s)；进度 / 地址栏 / 进退刷新 / 复制 / 系统浏览器  
+- [x] 深链确认弹窗（`xxx.com 要求打开「yyy」`）+ `launchAppLink`  
+- [x] 下载管理（记录 / 打开 / 重命名 / 删除 / 清除完成）  
+- [x] 网页收藏 + 浏览历史（max 200；无痕不写历史）  
+- [x] 无痕：关页清 Cookie / cache；`browserIncognito` Drift  
+- [x] 清理缓存：显示体积 + 二次确认  
+- [ ] **真机**综合测（0.0.9 tag）  
+
+**可选余项：** Android 原生 `openInBrowser` 防 App Links 回环；PRIVACY 补 cookies 说明
 
 ### 15.6.1 已实现：音视频媒体类型与播放器（P1）
 
@@ -1048,7 +1065,7 @@ flutter run -d <device>
 |------|------|
 | 进源页 | `markSourceSeen`：badge 清零 + 该源文章标已读 |
 | 删除源 | 硬删 feed + articles |
-| 外链 | 系统浏览器（WebView 后置） |
+| 外链 | 默认应用内 WebView；APK/安装 fallback 用系统浏览器 |
 | Scrubber | **仅详情目录**；New **不挂时间轨** |
 | 评论 | 有 Key 真 LLM；无 Key 不灌 mock；**sanitize 去 think/tool**；可 clearAll |
 | 人设 | 只写语气；场景 `kWepseedCommentScene` |
@@ -1073,7 +1090,8 @@ flutter run -d <device>
 | **0.0.6** | Android 视频 PiP（手动 / 回桌面自动）；schema 7 媒体 LLM 对话持久化与待回复续接；**真机通过** |
 | **0.0.7** | YouTube 规范 Atom + 去重；XML 声明编码；200 清除过期 ETag/Last-Modified；应用启动图标 |
 | **0.0.8** | Explore 雷达（功能真机 OK）；横向步骤 + sheet 选择；干净黑底白标图标；底栏可关 Explore |
-| **未收口** | Explore 体验余项；公网实例波动文案；拉取稳定性；媒体 M3；流式/WebView；E-ROM 可选 |
+| **0.0.9** | 应用内浏览器：inApp 外链、深链确认、下载/收藏/历史、无痕、清理缓存；schema 8；**待真机** |
+| **未收口** | 浏览器真机验收；Explore 体验余项；公网实例波动；拉取稳定性；媒体 M3；流式；E-ROM 可选 |
 
 ### 15.9 会话记录
 
@@ -1113,10 +1131,16 @@ flutter run -d <device>
 - Set「显示探索页」可关；草稿 `radar_prefs.json`  
 - 文档：`docs/RSSHUB_RADAR.md`；单测 `test/radar_url_test.dart`  
 
+**0.0.9 应用内浏览器：**  
+- `flutter_inappwebview` 6.1.5；`openUrl` 默认 inApp  
+- 深链确认；下载 / 收藏 / 历史；无痕；DATA 清理缓存（显大小）  
+- Drift schema 8 `browserIncognito`；单测 `open_url` / `app_link`  
+- tag `v0.0.9` · **待真机**  
+
 **下会话：**  
-1. Explore 体验余项（可选）或稳定性/媒体 M3  
-2. 公网实例失败换实例提示  
-3. 按用户反馈迭代
+1. 真机验收 0.0.9 浏览器  
+2. 按反馈修（App Links 回环等）  
+3. Explore / 稳定性 / 媒体 M3（可选）
 
 ---
 
