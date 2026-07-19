@@ -2,7 +2,7 @@
 
 > 版本：**0.0.9**（tag `v0.0.9` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
 > 平台：Flutter · Android 首发 · 本地优先（local-only）  
-> 状态：**0.0.9** 应用内浏览器（外链 / 下载 / 收藏 / 历史 / 无痕 / 清理缓存）；模拟器 OK，**待真机**  
+> 状态：**0.0.9 应用内浏览器真机 OK**（外链 / 深链 / 下载 / 收藏 / 历史 / 无痕 / 清理缓存）  
 > 开关：`kUseMockFeed` / `kUseMockComments`（`lib/core/config/app_flags.dart`）
 
 本文档只写**要做什么、做成什么样、怎么落地**。  
@@ -29,17 +29,17 @@
 |------|------|------|
 | 订阅 | 添加源、OPML 导入/导出、刷新 | **已接真**（Set + 源页） |
 | 刷 | New masonry 流 + 源主页 | **真 Stream + 下拉刷新**（时间轨已移除；**筛选已接**） |
-| 读 | 详情正文、已读、收藏 | **HTML 正文 + 图缓存 + 目录 scrubber**；外链 **应用内 WebView**（可转系统浏览器） |
+| 读 | 详情正文、已读、收藏 | **HTML 正文 + 图缓存 + 目录 scrubber**；外链 **应用内浏览器**（0.0.9 真机 OK；可转系统） |
 | 播 | RSS 音频 / 视频 | **文章级媒体识别 + 沉浸详情播放器 + 全局 mini + 音频后台通知 + 视频全屏 / Android PiP** |
 | 评 | TikTok 式评论区 + 多网友 | **真 LLM**；无 Key 不灌 mock；**去 think/tool 清洗**（0.0.4 真机通过）；**D-task 已验收**（`comment_jobs` + one-off WM） |
 | 回看 | ME 时间轴 | **Drift**；三 stat → 列表 CRUD（收藏/对话/痕迹，0.0.4 真机通过） |
-| 设 | 形象、主题、字号、多提供商/网友、DATA、关于 | **大部分真持久化**；关于 = 真版本 + GitHub 更新/协议 |
+| 设 | 形象、主题、字号、多提供商/网友、Browser、DATA、关于 | **大部分真持久化**；Browser 收藏/历史/下载/无痕；关于 = 真版本 + GitHub 更新/协议 |
 | 推 | WorkManager + 本地通知 | **已接 + 加固**：冷启动重排程、后台 isolate 插件注册、通知 channel、杀进程仍周期刷源+通知（OEM 另见 E-ROM） |
 | 发 | tag 驱动 Release | **已接** per-ABI APK + GitHub Actions（`v*`） |
 
 ---
 
-## 1. 当前代码现状（2026-07-17 对照 · **0.0.5 RC**）
+## 1. 当前代码现状（2026-07-19 对照 · **0.0.9**）
 
 ### 1.1 目录
 
@@ -49,29 +49,30 @@ lib/
   router/app_router.dart          # / · /article/:id · /source/:id · /me/bookmarks|chats|traces
   core/config/app_flags.dart · app_links.dart
   core/ui/app_toast.dart
-  core/theme/…  core/utils/…    # open_url · time_labels · monogram · feed_filter
+  core/theme/…  core/utils/…    # open_url · app_link · time_labels · monogram · feed_filter
   core/background/                # RSS WorkManager + 本地通知 · 选源限刷
   data/
     models/models.dart
     mock/mock_data.dart
-    db/tables.dart + app_database.dart   # Drift schemaVersion = 6（comment jobs + media fields）
+    db/tables.dart + app_database.dart   # Drift schemaVersion = 8（+ browserIncognito）
+    browser/                      # download · cache · bookmark · history JSON store
     comments/                     # comment_job_models · comment_generation_engine
     rss/ · llm/                   # HttpLlmClient 重试 + llm_text_sanitize
     update/github_update_service.dart
-    repositories/ …              # + comment_job_repository*
-  providers/ …
+    repositories/ …
+  providers/ …                    # + download · browser_library
   features/
-    new/ …  media/（player + LLM chat）…  me/（me_page + me_list_page）…
-    set/  set_page · llm_settings_section
+    browser/                      # in_app_browser · download_list · web_library
+    new/ …  media/ …  me/ …
+    explore/ · set/  set_page · llm_settings_section
   widgets/ glass_bottom_nav · edge_scrubber · …
 docs/
-  IMPLEMENTATION.md · MEDIA_PLAYER.md · TERMS.md · PRIVACY.md
-  SIGNING.private.md
+  IMPLEMENTATION.md · MEDIA_PLAYER.md · RSSHUB_RADAR.md · TERMS.md · PRIVACY.md
 .github/workflows/
   ci.yml · release.yml
-android/
+android/                          # 官方 Maven + storage.googleapis.com（无默认 Aliyun）
 test/
-  fixtures/ · rss_parser · toc · feed_filter · llm_client · llm_text_sanitize · semver · warm · widget · background_refresh · comment_job_repository
+  fixtures/ · open_url · app_link · rss_parser · …
 ```
 
 ### 1.2 已可交互（真 / 半真）
@@ -87,13 +88,14 @@ test/
 | 媒体 | RSS/Atom 音视频识别；音频后台/通知/倍速；视频全屏 / Android PiP；全局 mini；**持久**媒体 LLM 对话窗 |
 | 通知深链 | **`push`**；返回栈 **真机通过** |
 | ME | 时间轴 + **收藏/对话/痕迹列表 CRUD**（**0.0.4 真机通过**） |
-| Set · RSS / 关于 / DATA | 订阅 OPML；更新安装；**后台被杀？** 提示 |
+| Set · RSS / Browser / DATA / 关于 | 订阅 OPML；**Browser** 收藏/历史/下载/无痕；清理缓存；更新安装 |
+| 应用内浏览器 | 外链 inApp；深链确认；下载/收藏/历史；无痕；**0.0.9 真机通过** |
 | 后台推送 | WM 周期刷源 + 本地通知（**0.0.4 综合测通过**） |
-| 发布 | MIT；`v0.0.1`–`v0.0.4` per-ABI APK |
+| 发布 | MIT；`v0.0.1`–`v0.0.9` per-ABI APK |
 
 ### 1.3 明确未做 / 下一会话主路径
 
-**0.0.8 功能真机 OK**（雷达订阅 + 0.0.7 兼容）；Explore UI/图标已收口。
+**0.0.9 浏览器真机 OK**；Explore 雷达 0.0.8 真机 OK。
 
 | 优先级 | 项 |
 |--------|-----|
@@ -102,7 +104,7 @@ test/
 | 低 | 媒体 M3：进度持久化、下载缓存 |
 | 中 | E-ROM 长期：极端省电/多 ROM 文档与验收可继续补 |
 | 低 | 评论流式气泡 |
-| 中 | 应用内 WebView **M1/M2**（历史/书签/下载 · §15.6） |
+| 低 | 浏览器可选：Android 原生 `openInBrowser` 防 App Links 回环；PRIVACY 再补 cookies 说明 |
 | 基建 | CI Actions Node 20 弃用告警可择机升 action 大版本 |
 
 ### 1.4 关键接线（勿重造）
@@ -763,14 +765,14 @@ Item: pending → running → succeeded | skipped | failed
 - [x] 内联脏样式清洗 `sanitizeArticleHtml`（去 color/opacity）  
 - [x] 深色正文对比度（近白正文 + 提亮 secondary/tertiary）  
 - [x] 图片缓存 `cached_network_image`（列表/精选/封面/正文 img）  
-- [x] 外链：`openUrl` 默认 **应用内 WebView**（`flutter_inappwebview`）；菜单可转系统浏览器  
+- [x] 外链：`openUrl` 默认 **应用内浏览器**（`flutter_inappwebview`）；菜单可转系统浏览器  
 - [x] 复制链接 / 分享 / 导出 Markdown  
 - [x] dwell ≥180s → WarmEvent（每文每天最多 1 次；Drift 持久化）  
 - [x] **EdgeScrubber**：详情 h1–h3 目录跳转（New 时间轨已产品决策移除）  
   - 左侧中部细横杠；拖动当前杠变长变深；右侧浮层标题  
   - 右滑超过约 56px →「松开取消」  
   - 至少 2 个锚点才显示  
-- [x] 应用内 WebView **M0**（打开原文 / 正文链接 / 关闭·后退·复制·外开）→ **M1/M2 见 §15.6** 
+- [x] 应用内浏览器 **0.0.9 真机通过**（原文/链接/深链/下载/收藏/历史/无痕/清理缓存 · §15.6） 
 
 ### Phase D — 真 LLM ⚠ **主路径已接，体验未收口**
 
@@ -809,9 +811,9 @@ Item: pending → running → succeeded | skipped | failed
 - [x] New 筛选（真机通过）  
 - [x] 测试：LLM · sanitize · feed_filter · semver · background 常量  
 - [ ] 性能 / 错误空态补强  
-- [x] **应用内 WebView M0**（§15.6）；M1/M2 余  
+- [x] **应用内浏览器**（§15.6；**0.0.9 真机通过**）  
 
-> 下一会话：可选 **D-task** / 流式 / WebView。
+> 下一会话：Explore 余项 / 拉取稳定性 / 媒体 M3 / 流式（可选）。
 
 ---
 
@@ -911,9 +913,9 @@ UI 只依赖接口；**Phase B 新增 `DriftFeedRepository` / `DriftArticleRepos
 - [x] HTML 正文 / 图缓存 / 外链 / 分享复制  
 - [x] EdgeScrubber（**仅详情**目录；New 无时间轨）  
 - [x] 深色正文对比度  
-- [x] 应用内 WebView M0（`InAppBrowserPage` + `openUrl`）  
+- [x] 应用内浏览器（`InAppBrowserPage` + `openUrl` + 下载/收藏/历史；**0.0.9 真机通过**）  
 
-### 更后 / 0.0.3–0.0.4
+### 更后 / 0.0.3–0.0.9
 
 - [x] 后台刷新 + 通知进文章（E；**0.0.4 综合测通过**）  
 - [x] ME warm 持久化 + 温度规则（E）  
@@ -922,7 +924,7 @@ UI 只依赖接口；**Phase B 新增 `DriftFeedRepository` / `DriftArticleRepos
 - [x] 通知深链返回栈 + New 筛选（0.0.3；**真机通过**）  
 - [x] 评论 think/tool 清洗（0.0.4；**真机通过**）  
 - [x] **D-task** 评论任务持久化 + WM 恢复（**0.0.6 真机通过**）  
-- [ ] 应用内 WebView M1/M2（历史 / 书签 / 下载）  
+- [x] 应用内浏览器完整切片（**0.0.9 真机通过**）  
 - [x] P1 媒体类型 + 音视频播放器 + 全局 mini + 媒体专属 LLM 对话窗（**0.0.6 真机通过**）
 
 ---
@@ -957,7 +959,7 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.1 一句话
 
-**`v0.0.9`：应用内浏览器完整切片（打开原文、深链确认、下载/收藏/历史、无痕、清理缓存）。模拟器验收 OK；发 tag 供真机测。**
+**`v0.0.9`：应用内浏览器完整切片（打开原文、深链确认、下载/收藏/历史、无痕、清理缓存）。模拟器 + 用户真机验收无问题。下一会话可做 Explore 余项 / 拉取稳定性 / 媒体 M3 等。**
 
 ### 15.2 现状速查
 
@@ -967,7 +969,8 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 | Flag | `kUseMockFeed=false`；`kUseMockComments=false` |
 | 版本 | `pubspec` `0.0.9+9` |
 | Drift | **schemaVersion = 8**；+ `browserIncognito`；媒体/评论任务同前 |
-| 浏览器 | `lib/features/browser/` · `openUrl` 默认 inApp · Set Browser 区 |
+| 浏览器 | `lib/features/browser/` · `openUrl` 默认 inApp · Set Browser 区 · **0.0.9 真机通过** |
+| Gradle | 官方 `google` / `mavenCentral` / `storage.googleapis.com`；**无默认 Aliyun**（本地可选 `android/init.gradle`） |
 | 评论清洗 | `lib/data/llm/llm_text_sanitize.dart` · complete 后 + 入库前 |
 | 评论任务 | `lib/data/comments/comment_generation_engine.dart` · `comment_job_repository*` · `comment_job_worker.dart` |
 | ME 列表 | `/me/bookmarks` · `/me/chats` · `/me/traces` · `me_list_page.dart` |
@@ -990,8 +993,9 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 1. **Explore 体验余项（可选）**：步骤记忆进草稿、来源网格/热度排序、自定义实例测 healthz、空态引导去添加  
 2. **拉取稳定性**：公网 RSSHub 实例失败的用户文案与换实例提示  
-3. **WebView M1/M2** 或 媒体 M3 / E-ROM（见 §15.6）  
-4. 勿默认再抬版本，除非有可发版增量  
+3. **媒体 M3 / E-ROM / 流式评论**（可选）  
+4. 浏览器可选增强：App Links 回环 channel、PRIVACY cookies 说明  
+5. 勿默认再抬版本，除非有可发版增量  
 
 ### 15.4 不要做的事
 
@@ -1023,7 +1027,7 @@ flutter run -d <device>
 # 首选 wepseed-0.0.9-arm64-v8a.apk
 ```
 
-### 15.6 应用内 WebView 阅读器（Phase F · **0.0.9**）
+### 15.6 应用内浏览器（Phase F · **0.0.9 · 真机通过**）
 
 **产品诉求：** 外链优先应用内 WebView；下载 / 收藏 / 历史 / 无痕 / 清理缓存。
 
@@ -1034,9 +1038,11 @@ flutter run -d <device>
 | 入口 | `lib/core/utils/open_url.dart` → `openUrl` / `UrlOpenMode.inApp\|system` |
 | 接线 | 详情原文 / 正文链接 / Set 协议隐私 GitHub；**APK 仍 system** |
 | 设置 | Set · Browser：收藏 / 历史 / 下载 / 无痕；DATA · 清理缓存 |
+| 持久 | 应用支持目录 JSON：`browser_bookmarks.json` / `browser_history.json` / `browser_downloads.json` |
 | 参考 | `example/fluxdo/`（gitignored 对照） |
+| 验收 | **模拟器 + 用户真机无问题**（2026-07-19） |
 
-**已实现（模拟器 OK · 待真机）：**
+**已实现并验收：**
 
 - [x] inApp 打开 http(s)；进度 / 地址栏 / 进退刷新 / 复制 / 系统浏览器  
 - [x] 深链确认弹窗（`xxx.com 要求打开「yyy」`）+ `launchAppLink`  
@@ -1044,9 +1050,9 @@ flutter run -d <device>
 - [x] 网页收藏 + 浏览历史（max 200；无痕不写历史）  
 - [x] 无痕：关页清 Cookie / cache；`browserIncognito` Drift  
 - [x] 清理缓存：显示体积 + 二次确认  
-- [ ] **真机**综合测（0.0.9 tag）  
+- [x] **真机综合测**（0.0.9 tag）  
 
-**可选余项：** Android 原生 `openInBrowser` 防 App Links 回环；PRIVACY 补 cookies 说明
+**可选余项：** Android 原生 `openInBrowser` 防 App Links 回环；PRIVACY 再补 cookies 细则
 
 ### 15.6.1 已实现：音视频媒体类型与播放器（P1）
 
@@ -1090,8 +1096,8 @@ flutter run -d <device>
 | **0.0.6** | Android 视频 PiP（手动 / 回桌面自动）；schema 7 媒体 LLM 对话持久化与待回复续接；**真机通过** |
 | **0.0.7** | YouTube 规范 Atom + 去重；XML 声明编码；200 清除过期 ETag/Last-Modified；应用启动图标 |
 | **0.0.8** | Explore 雷达（功能真机 OK）；横向步骤 + sheet 选择；干净黑底白标图标；底栏可关 Explore |
-| **0.0.9** | 应用内浏览器：inApp 外链、深链确认、下载/收藏/历史、无痕、清理缓存；schema 8；**待真机** |
-| **未收口** | 浏览器真机验收；Explore 体验余项；公网实例波动；拉取稳定性；媒体 M3；流式；E-ROM 可选 |
+| **0.0.9** | 应用内浏览器：inApp 外链、深链确认、下载/收藏/历史、无痕、清理缓存；schema 8；CI 去掉 Aliyun；**真机通过** |
+| **未收口** | Explore 体验余项；公网实例波动；拉取稳定性；媒体 M3；流式；E-ROM 可选 |
 
 ### 15.9 会话记录
 
@@ -1131,16 +1137,17 @@ flutter run -d <device>
 - Set「显示探索页」可关；草稿 `radar_prefs.json`  
 - 文档：`docs/RSSHUB_RADAR.md`；单测 `test/radar_url_test.dart`  
 
-**0.0.9 应用内浏览器：**  
+**0.0.9 应用内浏览器 + 真机验收：**  
 - `flutter_inappwebview` 6.1.5；`openUrl` 默认 inApp  
 - 深链确认；下载 / 收藏 / 历史；无痕；DATA 清理缓存（显大小）  
 - Drift schema 8 `browserIncognito`；单测 `open_url` / `app_link`  
-- tag `v0.0.9` · **待真机**  
+- CI：去掉默认 Aliyun 镜像，显式 `storage.googleapis.com/download.flutter.io`  
+- tag `v0.0.9` · **用户真机综合测无问题**  
 
 **下会话：**  
-1. 真机验收 0.0.9 浏览器  
-2. 按反馈修（App Links 回环等）  
-3. Explore / 稳定性 / 媒体 M3（可选）
+1. Explore 体验余项 / 拉取稳定性（可选）  
+2. 媒体 M3 / 流式评论 / E-ROM（可选）  
+3. 浏览器可选：App Links channel、PRIVACY cookies 细则
 
 ---
 
