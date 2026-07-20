@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
@@ -9,12 +10,16 @@ import '../rss/opml.dart';
 import '../rss/rss_client.dart';
 import '../rss/rss_models.dart';
 import '../rss/rss_parser.dart';
+import '../rss/rss_refresh_config.dart';
 import 'feed_repository.dart';
 
 /// Real RSS feed store.
 ///
 /// **Delete policy:** hard-delete feed row, then cascade-delete its articles
 /// (comments are not FK-bound to articles; orphan comments may remain until C).
+///
+/// **Refresh (§15.10):** network work uses a bounded pool; all SQLite writes go
+/// through a single-writer queue; articles are batch-upserted per feed.
 class DriftFeedRepository implements FeedRepository {
   DriftFeedRepository(this._db, {RssClient? client, RssParser? parser})
     : _client = client ?? RssClient(),
@@ -24,8 +29,22 @@ class DriftFeedRepository implements FeedRepository {
   final RssClient _client;
   final RssParser _parser;
 
+  /// Serializes every DB mutation so concurrent fetch workers never write
+  /// the same connection out of order (avoids SQLITE_BUSY / stream storms).
+  Future<void> _writeTail = Future<void>.value();
+
+  /// Bumps on each [refreshAll]; unhealthy feeds skip on alternate rounds.
+  int _refreshRound = 0;
+
   void dispose() {
     _client.close();
+  }
+
+  Future<T> _serializedWrite<T>(Future<T> Function() op) {
+    final result = _writeTail.then((_) => op());
+    // Keep the chain alive after failures so later writers still run.
+    _writeTail = result.then<void>((_) {}, onError: (_) {});
+    return result;
   }
 
   @override
@@ -55,7 +74,11 @@ class DriftFeedRepository implements FeedRepository {
       return;
     }
 
-    final fetch = await _client.fetch(normalized);
+    final sw = Stopwatch()..start();
+    final fetch = await _client.fetch(
+      normalized,
+      timeout: RssRefreshLimits.addFeedTimeout,
+    );
     if (fetch.body == null) {
       throw RssException('无法获取源内容');
     }
@@ -65,7 +88,10 @@ class DriftFeedRepository implements FeedRepository {
         _db.feeds,
       )..where((t) => t.url.equals(resolvedUrl))).getSingleOrNull();
       if (resolvedExisting != null) {
-        await _refreshRow(resolvedExisting);
+        await _refreshRow(
+          resolvedExisting,
+          timeout: RssRefreshLimits.addFeedTimeout,
+        );
         return;
       }
     }
@@ -73,37 +99,52 @@ class DriftFeedRepository implements FeedRepository {
     final now = DateTime.now();
     final id = _feedIdForUrl(resolvedUrl);
     final siteUrl = parsed.siteUrl ?? _origin(resolvedUrl);
+    final latencyMs = sw.elapsedMilliseconds;
 
-    await _db
-        .into(_db.feeds)
-        .insert(
-          FeedsCompanion.insert(
-            id: id,
-            title: parsed.title,
-            url: resolvedUrl,
-            siteUrl: Value(siteUrl),
-            lastFetchedAt: Value(now),
-            etag: Value(fetch.etag),
-            lastModified: Value(fetch.lastModified),
-            createdAt: now,
-          ),
+    await _serializedWrite(() async {
+      await _db.transaction(() async {
+        await _db
+            .into(_db.feeds)
+            .insert(
+              FeedsCompanion.insert(
+                id: id,
+                title: parsed.title,
+                url: resolvedUrl,
+                siteUrl: Value(siteUrl),
+                lastFetchedAt: Value(now),
+                etag: Value(fetch.etag),
+                lastModified: Value(fetch.lastModified),
+                createdAt: now,
+                lastSuccessAt: Value(now),
+                consecutiveFailures: const Value(0),
+                avgLatencyMs: Value(latencyMs),
+              ),
+            );
+        await _upsertItems(
+          feedId: id,
+          items: parsed.items,
+          fetchedAt: now,
         );
-
-    await _upsertItems(feedId: id, items: parsed.items, fetchedAt: now);
+      });
+    });
   }
 
   @override
   Future<void> removeFeed(String id) async {
-    // Cascade: articles first (no ON DELETE CASCADE declared on table).
-    await (_db.delete(_db.articles)..where((t) => t.feedId.equals(id))).go();
-    await (_db.delete(_db.feeds)..where((t) => t.id.equals(id))).go();
+    await _serializedWrite(() async {
+      // Cascade: articles first (no ON DELETE CASCADE declared on table).
+      await (_db.delete(_db.articles)..where((t) => t.feedId.equals(id))).go();
+      await (_db.delete(_db.feeds)..where((t) => t.id.equals(id))).go();
+    });
   }
 
   @override
   Future<void> setPaused(String id, bool paused) async {
-    await (_db.update(_db.feeds)..where((t) => t.id.equals(id))).write(
-      FeedsCompanion(isPaused: Value(paused)),
-    );
+    await _serializedWrite(() async {
+      await (_db.update(_db.feeds)..where((t) => t.id.equals(id))).write(
+        FeedsCompanion(isPaused: Value(paused)),
+      );
+    });
   }
 
   @override
@@ -113,28 +154,43 @@ class DriftFeedRepository implements FeedRepository {
     )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
     if (row.isPaused) return;
-    await _refreshRow(row);
+    // User-initiated: always pull (health skip only applies to refreshAll).
+    await _refreshRow(row, timeout: RssRefreshLimits.singleFeedTimeout);
   }
 
   @override
   Future<void> refreshAll({
     bool wifiOnly = false,
     Iterable<String>? feedIds,
+    RssRefreshMode mode = RssRefreshMode.foreground,
   }) async {
     // wifiOnly is honored by background worker (Phase E); UI refresh ignores it.
+    final limits = RssRefreshLimits.forMode(mode);
     final scoped = feedIds?.where((id) => id.isNotEmpty).toSet();
     final query = _db.select(_db.feeds)..where((t) => t.isPaused.equals(false));
     if (scoped != null && scoped.isNotEmpty) {
       query.where((t) => t.id.isIn(scoped));
     }
     final rows = await query.get();
+    if (rows.isEmpty) return;
+
+    final round = ++_refreshRound;
+    final selected = <FeedRow>[];
     for (final row in rows) {
-      try {
-        await _refreshRow(row);
-      } catch (_) {
-        // Continue other feeds; per-feed errors surface on next single refresh.
-      }
+      if (_shouldSkipUnhealthy(row, round)) continue;
+      selected.add(row);
     }
+    if (selected.isEmpty) return;
+
+    selected.sort(_compareByHealth);
+
+    await _runPool(selected, limits.poolSize, (row) async {
+      try {
+        await _refreshRow(row, timeout: limits.timeout);
+      } catch (_) {
+        // Continue other feeds; per-feed errors are recorded as health.
+      }
+    });
   }
 
   @override
@@ -168,97 +224,205 @@ class DriftFeedRepository implements FeedRepository {
     );
   }
 
-  Future<void> _refreshRow(FeedRow row) async {
-    final fetch = await _client.fetch(
-      row.url,
-      etag: row.etag,
-      lastModified: row.lastModified,
-    );
-    final now = DateTime.now();
-    if (fetch.notModified) {
-      await (_db.update(_db.feeds)..where((t) => t.id.equals(row.id))).write(
-        FeedsCompanion(lastFetchedAt: Value(now)),
+  /// Fetch + parse off the write path; apply via [_serializedWrite].
+  Future<void> _refreshRow(
+    FeedRow row, {
+    required Duration timeout,
+  }) async {
+    final sw = Stopwatch()..start();
+    try {
+      final fetch = await _client.fetch(
+        row.url,
+        etag: row.etag,
+        lastModified: row.lastModified,
+        timeout: timeout,
       );
-      return;
-    }
-    if (fetch.body == null) return;
+      final latencyMs = sw.elapsedMilliseconds;
+      final now = DateTime.now();
 
-    final parsed = _parser.parse(fetch.body!, sourceUrl: row.url);
-    await (_db.update(_db.feeds)..where((t) => t.id.equals(row.id))).write(
-      FeedsCompanion(
-        title: Value(parsed.title),
-        siteUrl: Value(parsed.siteUrl ?? row.siteUrl),
-        lastFetchedAt: Value(now),
-        // A successful 200 replaces validators. Keeping a validator which a
-        // server no longer sends can make subsequent refreshes incorrectly 304.
-        etag: Value(fetch.etag),
-        lastModified: Value(fetch.lastModified),
-      ),
-    );
-    await _upsertItems(feedId: row.id, items: parsed.items, fetchedAt: now);
+      if (fetch.notModified) {
+        await _serializedWrite(() async {
+          await (_db.update(_db.feeds)..where((t) => t.id.equals(row.id)))
+              .write(
+            FeedsCompanion(
+              lastFetchedAt: Value(now),
+              lastSuccessAt: Value(now),
+              consecutiveFailures: const Value(0),
+              lastErrorMessage: const Value(null),
+              avgLatencyMs: Value(_ewma(row.avgLatencyMs, latencyMs)),
+            ),
+          );
+        });
+        return;
+      }
+      if (fetch.body == null) return;
+
+      final parsed = _parser.parse(fetch.body!, sourceUrl: row.url);
+      await _serializedWrite(() async {
+        await _db.transaction(() async {
+          await (_db.update(_db.feeds)..where((t) => t.id.equals(row.id)))
+              .write(
+            FeedsCompanion(
+              title: Value(parsed.title),
+              siteUrl: Value(parsed.siteUrl ?? row.siteUrl),
+              lastFetchedAt: Value(now),
+              // A successful 200 replaces validators. Keeping a validator which a
+              // server no longer sends can make subsequent refreshes incorrectly 304.
+              etag: Value(fetch.etag),
+              lastModified: Value(fetch.lastModified),
+              lastSuccessAt: Value(now),
+              consecutiveFailures: const Value(0),
+              lastErrorMessage: const Value(null),
+              avgLatencyMs: Value(_ewma(row.avgLatencyMs, latencyMs)),
+            ),
+          );
+          await _upsertItems(
+            feedId: row.id,
+            items: parsed.items,
+            fetchedAt: now,
+          );
+        });
+      });
+    } catch (e) {
+      final latencyMs = sw.elapsedMilliseconds;
+      final message = e is RssException ? e.message : e.toString();
+      final now = DateTime.now();
+      try {
+        await _serializedWrite(() async {
+          await (_db.update(_db.feeds)..where((t) => t.id.equals(row.id)))
+              .write(
+            FeedsCompanion(
+              lastErrorAt: Value(now),
+              lastErrorMessage: Value(
+                message.length > 240 ? message.substring(0, 240) : message,
+              ),
+              consecutiveFailures: Value(row.consecutiveFailures + 1),
+              avgLatencyMs: Value(_ewma(row.avgLatencyMs, latencyMs)),
+            ),
+          );
+        });
+      } catch (_) {
+        // Health write is best-effort; surface original error.
+      }
+      rethrow;
+    }
   }
 
   /// Upsert by UNIQUE(feedId, guid). Preserves isRead / isBookmarked on update.
+  ///
+  /// One batch per feed: load existing guids once, then insert/update in bulk.
   Future<void> _upsertItems({
     required String feedId,
     required List<ParsedItem> items,
     required DateTime fetchedAt,
   }) async {
-    for (final item in items) {
-      final existing =
-          await (_db.select(_db.articles)..where(
-                (t) => t.feedId.equals(feedId) & t.guid.equals(item.guid),
-              ))
-              .getSingleOrNull();
+    if (items.isEmpty) return;
 
-      if (existing != null) {
-        await (_db.update(
-          _db.articles,
-        )..where((t) => t.id.equals(existing.id))).write(
-          ArticlesCompanion(
-            link: Value(item.link),
-            title: Value(item.title),
-            author: Value(item.author),
-            summary: Value(item.summary),
-            contentHtml: Value(item.contentHtml),
-            contentText: Value(item.contentText),
-            imageUrl: Value(item.imageUrl ?? existing.imageUrl),
-            mediaType: Value(articleMediaTypeToDb(item.mediaType)),
-            enclosureUrl: Value(item.enclosureUrl),
-            enclosureMime: Value(item.enclosureMime),
-            enclosureLength: Value(item.enclosureLength),
-            durationSeconds: Value(item.durationSeconds),
-            publishedAt: Value(item.publishedAt),
-            fetchedAt: Value(fetchedAt),
-          ),
-        );
-      } else {
-        final id = _articleId(feedId, item.guid);
-        await _db
-            .into(_db.articles)
-            .insert(
-              ArticlesCompanion.insert(
-                id: id,
-                feedId: feedId,
-                guid: item.guid,
-                link: Value(item.link),
-                title: item.title,
-                author: Value(item.author),
-                summary: Value(item.summary),
-                contentHtml: Value(item.contentHtml),
-                contentText: Value(item.contentText),
-                imageUrl: Value(item.imageUrl),
-                mediaType: Value(articleMediaTypeToDb(item.mediaType)),
-                enclosureUrl: Value(item.enclosureUrl),
-                enclosureMime: Value(item.enclosureMime),
-                enclosureLength: Value(item.enclosureLength),
-                durationSeconds: Value(item.durationSeconds),
-                publishedAt: item.publishedAt,
-                fetchedAt: fetchedAt,
-              ),
-            );
+    final guids = items.map((i) => i.guid).toList(growable: false);
+    final existingRows =
+        await (_db.select(_db.articles)..where(
+              (t) => t.feedId.equals(feedId) & t.guid.isIn(guids),
+            ))
+            .get();
+    final byGuid = {for (final r in existingRows) r.guid: r};
+
+    await _db.batch((batch) {
+      for (final item in items) {
+        final existing = byGuid[item.guid];
+        if (existing != null) {
+          batch.update(
+            _db.articles,
+            ArticlesCompanion(
+              link: Value(item.link),
+              title: Value(item.title),
+              author: Value(item.author),
+              summary: Value(item.summary),
+              contentHtml: Value(item.contentHtml),
+              contentText: Value(item.contentText),
+              imageUrl: Value(item.imageUrl ?? existing.imageUrl),
+              mediaType: Value(articleMediaTypeToDb(item.mediaType)),
+              enclosureUrl: Value(item.enclosureUrl),
+              enclosureMime: Value(item.enclosureMime),
+              enclosureLength: Value(item.enclosureLength),
+              durationSeconds: Value(item.durationSeconds),
+              publishedAt: Value(item.publishedAt),
+              fetchedAt: Value(fetchedAt),
+            ),
+            where: (t) => t.id.equals(existing.id),
+          );
+        } else {
+          final id = _articleId(feedId, item.guid);
+          batch.insert(
+            _db.articles,
+            ArticlesCompanion.insert(
+              id: id,
+              feedId: feedId,
+              guid: item.guid,
+              link: Value(item.link),
+              title: item.title,
+              author: Value(item.author),
+              summary: Value(item.summary),
+              contentHtml: Value(item.contentHtml),
+              contentText: Value(item.contentText),
+              imageUrl: Value(item.imageUrl),
+              mediaType: Value(articleMediaTypeToDb(item.mediaType)),
+              enclosureUrl: Value(item.enclosureUrl),
+              enclosureMime: Value(item.enclosureMime),
+              enclosureLength: Value(item.enclosureLength),
+              durationSeconds: Value(item.durationSeconds),
+              publishedAt: item.publishedAt,
+              fetchedAt: fetchedAt,
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  /// Bounded worker pool (single isolate; index advance is await-atomic).
+  static Future<void> _runPool<T>(
+    List<T> items,
+    int concurrency,
+    Future<void> Function(T item) work,
+  ) async {
+    if (items.isEmpty) return;
+    final pool = math.max(1, math.min(concurrency, items.length));
+    var next = 0;
+
+    Future<void> worker() async {
+      while (true) {
+        final i = next;
+        next = i + 1;
+        if (i >= items.length) return;
+        await work(items[i]);
       }
     }
+
+    await Future.wait(List.generate(pool, (_) => worker()));
+  }
+
+  /// Skip unhealthy sources on alternate [refreshAll] rounds (not user force).
+  static bool _shouldSkipUnhealthy(FeedRow row, int round) {
+    if (row.consecutiveFailures < RssRefreshLimits.unhealthyFailureThreshold) {
+      return false;
+    }
+    // Even rounds skip; odd rounds still probe.
+    return round.isEven;
+  }
+
+  /// Prefer healthier / faster sources first so UI sees good data earlier.
+  static int _compareByHealth(FeedRow a, FeedRow b) {
+    final byFailures = a.consecutiveFailures.compareTo(b.consecutiveFailures);
+    if (byFailures != 0) return byFailures;
+    final la = a.avgLatencyMs ?? 1 << 30;
+    final lb = b.avgLatencyMs ?? 1 << 30;
+    return la.compareTo(lb);
+  }
+
+  /// Exponential weighted moving average (≈70% history / 30% sample).
+  static int _ewma(int? previous, int sampleMs) {
+    if (previous == null || previous <= 0) return sampleMs;
+    return ((previous * 7) + (sampleMs * 3)) ~/ 10;
   }
 
   FeedSource _mapFeed(FeedRow r) {

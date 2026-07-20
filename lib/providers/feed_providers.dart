@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/models.dart';
 import '../data/repositories/feed_repository.dart';
+import '../data/rss/rss_refresh_config.dart';
 import 'core_providers.dart';
 
 final feedsProvider = StreamProvider<List<FeedSource>>((ref) {
@@ -35,8 +36,12 @@ class FeedActions {
 
   Future<void> refreshFeed(String id) => _repo.refreshFeed(id);
 
-  Future<void> refreshAll({bool wifiOnly = false, Iterable<String>? feedIds}) =>
-      _repo.refreshAll(wifiOnly: wifiOnly, feedIds: feedIds);
+  Future<void> refreshAll({
+    bool wifiOnly = false,
+    Iterable<String>? feedIds,
+    RssRefreshMode mode = RssRefreshMode.foreground,
+  }) =>
+      _repo.refreshAll(wifiOnly: wifiOnly, feedIds: feedIds, mode: mode);
 
   Future<void> importOpml(String xml) => _repo.importOpml(xml);
 

@@ -1,8 +1,8 @@
 # WEPSEED 功能实现文档
 
-> 版本：**0.0.9**（tag `v0.0.9` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
+> 版本：**0.0.10**（tag `v0.0.10` · 开源 MIT · GitHub [WEP-56/wepseed](https://github.com/WEP-56/wepseed)）  
 > 平台：Flutter · Android 首发 · 本地优先（local-only）  
-> 状态：**0.0.9 应用内浏览器真机 OK**（外链 / 深链 / 下载 / 收藏 / 历史 / 无痕 / 清理缓存）  
+> 状态：**0.0.10 RSS 刷新引擎**（有界并发 + 批量写库 + 健康度骨架；单测通过）· **0.0.9 浏览器真机 OK**  
 > 开关：`kUseMockFeed` / `kUseMockComments`（`lib/core/config/app_flags.dart`）
 
 本文档只写**要做什么、做成什么样、怎么落地**。  
@@ -39,7 +39,7 @@
 
 ---
 
-## 1. 当前代码现状（2026-07-19 对照 · **0.0.9**）
+## 1. 当前代码现状（2026-07-20 对照 · **0.0.10**）
 
 ### 1.1 目录
 
@@ -91,7 +91,7 @@ test/
 | Set · RSS / Browser / DATA / 关于 | 订阅 OPML；**Browser** 收藏/历史/下载/无痕；清理缓存；更新安装 |
 | 应用内浏览器 | 外链 inApp；深链确认；下载/收藏/历史；无痕；**0.0.9 真机通过** |
 | 后台推送 | WM 周期刷源 + 本地通知（**0.0.4 综合测通过**） |
-| 发布 | MIT；`v0.0.1`–`v0.0.9` per-ABI APK |
+| 发布 | MIT；`v0.0.1`–`v0.0.10` per-ABI APK |
 
 ### 1.3 明确未做 / 下一会话主路径
 
@@ -99,8 +99,9 @@ test/
 
 | 优先级 | 项 |
 |--------|-----|
-| **高** | **RSS 刷新速度/稳定性**（§15.10）：有界并发 + 超时分层 + 批量写库 + 写路径串行；增量 UI；健康度调度骨架 |
 | 中 | **内容拉取稳定性余项**：公网 RSSHub 失败文案 / 换实例；偶发失败分层定位 |
+| 低 | **RSS 刷新 UI 策略 B**（§15.10.5）：首源完成或 ~800ms 后结束 RefreshIndicator，后台续刷 |
+| 低 | OPML 导入有界并发（同刷新池思路） |
 | 低 | **Explore 体验余项**：步骤记忆、来源网格、实例 healthz 提示 |
 | 低 | 媒体 M3：进度持久化、下载缓存 |
 | 中 | E-ROM 长期：极端省电/多 ROM 文档与验收可继续补 |
@@ -117,10 +118,11 @@ test/
 | Guid | guid → link → sha1(title\|published) | 刷新 upsert 不重复 |
 | Feed URL | 以 `fetch.resolvedUrl`（YouTube 规范 Atom 等）入库 / 去重 | 勿用页面 URL 与 Atom URL 各订一次 |
 | RSS 体编码 | `_decodeXmlBody`：header charset / XML 声明 / UTF-8 / latin1 | 勿假设 `response.body` 默认 charset |
-| 条件缓存 | 200 时 `etag`/`lastModified` 以响应为准（可 null 清除）；304 只碰 `lastFetchedAt` | 避免服务端停发 validator 后误 304；**已贯通**，改并发后须锁测 |
-| RSS 刷新 | `refreshAll` **串行** `await _refreshRow`；单源 try/catch 续跑 | 有 25s 超时；坏源拖墙钟；下会话 §15.10 |
-| RSS upsert | `_upsertItems` **每篇** SELECT+写 | 改批量 transaction；写库单队列 |
-| RssClient | `DriftFeedRepository` 持有长生命周期实例 | **勿**每源 new Client；可调 `maxConnectionsPerHost` |
+| 条件缓存 | 200 时 `etag`/`lastModified` 以响应为准（可 null 清除）；304 只碰 `lastFetchedAt`（+ health） | 避免服务端停发 validator 后误 304；**已贯通 + 并发后单测锁** |
+| RSS 刷新 | `refreshAll` **有界并发池** + `RssRefreshMode`；写库 **单队列** | 前台 pool=6/15s；后台 pool=3/20s；`rss_refresh_config.dart` |
+| RSS upsert | 每源 **一次 batch**：`guid IN` 后 insert/update；保 isRead/isBookmarked | 勿改回每篇 SELECT+写 |
+| 源健康 | `feeds`：failures / latency EWMA / lastError*；**无 UI** | ≥3 失败隔轮跳过；手动 `refreshFeed` 强制拉 |
+| RssClient | `DriftFeedRepository` 持有长生命周期实例；`fetch(timeout:)` | **勿**每源 new Client |
 | 外链 | `openUrl` → 默认 **inApp** WebView；APK 等 `UrlOpenMode.system` | `lib/features/browser/` · §15.6 |
 | Scrubber | `EdgeScrubber` | **仅详情** h1–h3；New **不挂**时间轨 |
 | LLM | `http_llm_client` + `scheduled_llm_client` + **`llm_text_sanitize`** | 重试 `_postJson`；测连绕过 scheduler；入库前清洗 think/tool |
@@ -222,14 +224,17 @@ Set 内 sheet 仍用 `showModalBottomSheet`（提供商/网友编辑）。深链
 
 ## 3. 领域模型（对照 Drift + models.dart）
 
-### 3.1 表 / 实体（schemaVersion = 6）
+### 3.1 表 / 实体（schemaVersion = 9）
 
 ```text
 # RSS（Phase B 主写）
 feeds
   id, title, url UNIQUE, siteUrl?, iconUrl?,
   lastFetchedAt?, etag?, lastModified?,
-  isPaused, createdAt
+  isPaused, createdAt,
+  # §15.10 调度健康（无 UI）
+  lastSuccessAt?, lastErrorAt?, lastErrorMessage?,
+  consecutiveFailures, avgLatencyMs?
 
 articles
   id, feedId → feeds, guid, link?,
@@ -661,23 +666,22 @@ data (rss, llm, db, secure_storage, notifications)
 
 ## 7. 数据流关键路径
 
-### 7.1 刷新一篇源（单源 · 现状）
+### 7.1 刷新源（§15.10 已实现）
 
 ```
 User/WorkManager
-  → FeedRepository.refresh(feedId) / refreshAll（现为串行 for+await）
-  → RssClient.fetch(url, etag?, lastModified?)
+  → refreshAll(mode) / refreshFeed
+  → 健康排序 + 隔轮跳过（仅 refreshAll；手动单源强制）
+  → 有界并发池：RssClient.fetch(url, etag?, lastModified?, timeout)
        YouTube 页 → 规范 Atom；频道页 HTML 不带条件头
-  → HTTP GET（If-None-Match / If-Modified-Since，若有）· timeout 25s
-  → 304 → 只更新 lastFetchedAt
-  → 200 → _decodeXmlBody → Parse items
-       写回 etag/lastModified（响应无则清 null）
-  → Upsert articles（现：每篇 SELECT+INSERT/UPDATE）
-  → Stream 自然推 UI
-  → 后台：整轮 refreshAll 后再 diff 新文章发通知
+  → HTTP GET · 前台 15s / 后台 20s
+  → 304 → 写队列：lastFetchedAt + health success
+  → 200 → parse → 写队列 transaction：
+       feed 元数据 + etag/lastModified（无则 null）+ health
+       batch upsert articles（保 isRead/isBookmarked）
+  → Stream 增量推 UI（策略 A：指示器仍等整轮 pool）
+  → 后台：整轮后再 diff 新文章发通知
 ```
-
-**目标形态（§15.10）：** 网络有界并发 + 写库串行队列 + 每源批量事务；UI 靠 Stream 增量更新，不必等全源结束才出现新文。
 
 ### 7.2 打开文章
 
@@ -964,25 +968,26 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.1 一句话
 
-**`v0.0.9` 浏览器真机 OK。下一会话主路径：RSS 刷新速度/稳定性（有界并发 + 超时分层 + 批量写库 + 写路径串行 + 增量 UI + 健康度骨架）— 见 §15.10。**
+**`v0.0.10`：§15.10 RSS 刷新引擎已发版（有界并发 + 超时分层 + 批量写库 + 写队列 + 健康度骨架；单测通过）。下一会话可：真机体感多源刷新 / RSSHub 文案 / Explore 余项 / 刷新 UI 策略 B（可选）。**
 
 ### 15.2 现状速查
 
 | 模块 | 路径 / 要点 |
 |------|-------------|
-| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.9`** |
+| 仓库 | https://github.com/WEP-56/wepseed · MIT · tag **`v0.0.10`** |
 | Flag | `kUseMockFeed=false`；`kUseMockComments=false` |
-| 版本 | `pubspec` `0.0.9+9` |
-| Drift | **schemaVersion = 8**；+ `browserIncognito`；媒体/评论任务同前 |
+| 版本 | `pubspec` `0.0.10+10` |
+| Drift | **schemaVersion = 9**；+ feed health 列；+ `browserIncognito`；媒体/评论任务同前 |
 | 浏览器 | `lib/features/browser/` · `openUrl` 默认 inApp · Set Browser 区 · **0.0.9 真机通过** |
 | Gradle | 官方 `google` / `mavenCentral` / `storage.googleapis.com`；**无默认 Aliyun**（本地可选 `android/init.gradle`） |
 | 评论清洗 | `lib/data/llm/llm_text_sanitize.dart` · complete 后 + 入库前 |
 | 评论任务 | `lib/data/comments/comment_generation_engine.dart` · `comment_job_repository*` · `comment_job_worker.dart` |
 | ME 列表 | `/me/bookmarks` · `/me/chats` · `/me/traces` · `me_list_page.dart` |
-| RSS 客户端 | `lib/data/rss/rss_client.dart`：YouTube 别名、编码解码、`resolvedUrl`；**timeout 25s**；repo 持有长生命周期 Client |
-| RSS 仓库 | `lib/data/repositories/drift_feed_repository.dart`：`refreshAll` **串行**；etag/lastModified **已贯通**；`_upsertItems` 每篇写 |
-| RSS 回归 | `test/rss_parser_test.dart`（YouTube / charset / stale ETag） |
-| RSS 下一刀 | **§15.10** 并发池 / 批量 upsert / 健康度 |
+| RSS 配置 | `lib/data/rss/rss_refresh_config.dart`：`RssRefreshMode` + pool/timeout |
+| RSS 客户端 | `lib/data/rss/rss_client.dart`：YouTube 别名、编码、`resolvedUrl`；**`fetch(timeout:)`**；长生命周期 Client |
+| RSS 仓库 | `drift_feed_repository.dart`：**并发池** + **写队列** + **batch upsert** + health 排序/隔轮跳过 |
+| RSS 回归 | `test/rss_parser_test.dart` + **`test/rss_refresh_engine_test.dart`**（并发墙钟 / 304 / 清 validator / 保已读收藏 / 健康跳过） |
+| RSS 余项 | 策略 B 早结束指示器；OPML 导入并发；真机体感多源刷新 |
 | Explore 雷达 | `features/explore/explore_page.dart`：**横向 4 步**（实例→来源→参数→完成）；选择用 **bottom sheet**；测试/添加/草稿 |
 | 雷达数据 | `assets/rsshub/radar_catalog.json` · 文档 `docs/RSSHUB_RADAR.md` · 重建 `docs/_build_radar_catalog.py` |
 | 雷达草稿 | `RadarPrefs` → 应用支持目录 `radar_prefs.json`（`showExploreTab` + draft） |
@@ -997,10 +1002,10 @@ Scrubber:      左侧中部细横杠；选中变长变深；右滑取消
 
 ### 15.3 下一会话建议顺序
 
-1. **RSS 刷新引擎（主路径 · §15.10）**：有界并发 + 超时分层 + 批量写库 + 写队列串行 + Stream 增量 UI；ETag 回归锁；可选健康度骨架  
-2. **拉取稳定性文案（可顺手）**：公网 RSSHub 失败 / 换实例提示  
+1. **真机**：多源下拉刷新墙钟 / 坏源不拖死 / 已读收藏不丢 / 304 仍省流量  
+2. **拉取稳定性文案**：公网 RSSHub 失败 / 换实例提示  
 3. Explore 体验余项 / 媒体 M3 / 流式 / E-ROM（可选）  
-4. 浏览器可选：App Links channel  
+4. 可选：刷新 UI 策略 B；OPML 导入并发  
 5. 勿默认再抬版本，除非有可发版增量  
 
 ### 15.4 不要做的事
@@ -1032,8 +1037,8 @@ flutter pub get
 flutter analyze
 flutter test
 flutter run -d <device>
-# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.9
-# 首选 wepseed-0.0.9-arm64-v8a.apk
+# Release：https://github.com/WEP-56/wepseed/releases/tag/v0.0.10
+# 首选 wepseed-0.0.10-arm64-v8a.apk
 ```
 
 ### 15.6 应用内浏览器（Phase F · **0.0.9 · 真机通过**）
@@ -1063,123 +1068,78 @@ flutter run -d <device>
 
 **可选余项：** Android 原生 `openInBrowser` 防 App Links 回环；PRIVACY cookies 细则
 
-### 15.10 Backlog：RSS 刷新速度 / 稳定性（下一会话主路径）
+### 15.10 RSS 刷新速度 / 稳定性（**代码已落地 · 单测通过 · 待真机**）
 
 > 产品共识（2026-07-19）：串行拉取不能继续；坏/慢源拖整轮墙钟；写库 N+1 与「等全源完成」放大卡顿。  
 > **一句话目标：** 网络有界并发 + 硬超时；写库按源批量事务且写路径串行；UI 靠 Stream 增量更新；ETag 链路保持并加测；健康度只做调度、不进 UI。
 
-#### 15.10.1 现状诊断（已核对代码）
+#### 15.10.1 改前诊断（历史）
 
-| 点 | 现状 | 问题 |
+| 点 | 改前 | 问题 |
 |----|------|------|
-| `refreshAll` | `for` + `await _refreshRow` **串行** | 总时间 ≈ Σ min(耗时, timeout)；源多则分钟级 |
-| 单源失败 | `try/catch` 继续 | **不会**永久卡死；但坏源仍吃满 timeout |
-| 超时 | `RssClient` **25s** 统一 | 偏长；前台/后台未分层 |
-| HTTP Client | `DriftFeedRepository` 持有一个 `RssClient` | **已复用**，勿改回每请求 new |
-| ETag / 304 | 读库 → 条件头 → 304 只更 `lastFetchedAt`；200 写回/清 validator | **已贯通**；改并发后须回归锁 |
-| `_upsertItems` | 每篇 `SELECT` + `INSERT`/`UPDATE` | 30 源×50 篇 = 上千次 DB；Stream 风暴 |
-| UI | New 下拉 `await refreshAll` 整轮结束 | 中间即使落库，指示器仍转完整轮 |
-| OPML 导入 | 串行 `addFeed` | 同样可限流并发（可后置） |
+| `refreshAll` | `for` + `await _refreshRow` **串行** | 总时间 ≈ Σ min(耗时, timeout) |
+| 超时 | `RssClient` **25s** 统一 | 前台/后台未分层 |
+| `_upsertItems` | 每篇 `SELECT` + 写 | N×M 次 DB；Stream 风暴 |
 
-路径：`lib/data/repositories/drift_feed_repository.dart` · `lib/data/rss/rss_client.dart` · `runRssRefreshJob`。
+路径：`drift_feed_repository.dart` · `rss_client.dart` · `rss_refresh_config.dart` · `runRssRefreshJob`。
 
-#### 15.10.2 目标架构
+#### 15.10.2 已实现架构
 
 ```
-refreshAll(context: foreground | background)
+refreshAll(mode: foreground | background)
   → 选源（未暂停 + 可选 feedIds）
-  → 按健康分排序（可选；失败多稍后 / 隔轮跳过）
+  → 健康：failures≥3 且偶数轮 → 跳过；其余按 failures↑ / latency↑ 排序
   → 网络并发池 poolSize
        每个任务: fetch(timeout) → parse → 入「写库队列」
   → 写库单队列（串行）:
        每源一次 transaction
-         · 批量查已有 guid
-         · insert / update 批处理
+         · 批量查已有 guid（IN）
+         · batch insert / update（不覆盖 isRead/isBookmarked）
          · 更新 feed 元数据 + etag/lastModified + health
-       · Stream 自然推 UI（用户立刻看到新文）
-  → await 本轮调度结束
-  → RefreshSummary(ok, failed, skipped, newArticleIds)
-  → 后台：用 newArticleIds 或结束后 diff 发通知
+       · Stream 自然推 UI（列表可先出现新文）
+  → await 本轮 pool 结束（策略 A）
+  → 后台：整轮结束后 article id diff 发通知（未改）
 ```
 
-**关键约束：网络可并行，写 SQLite 必须单写者队列**（避免 SQLITE_BUSY / 乱序 Stream）。
+**约束：网络可并行，写 SQLite 必须单写者队列。**
 
-#### 15.10.3 默认参数（已确认）
+#### 15.10.3 默认参数（已实现）
 
 | 场景 | 并发 pool | HTTP timeout | 说明 |
 |------|-----------|--------------|------|
-| 前台下拉 / 手动刷新 | **6**（允许配置 4–8） | **15s** | 用户可再拉 |
-| 后台 WorkManager | **3**（允许 2–4） | **20s** | 省电 / 少被杀 |
-| 添加单源 `addFeed` | 1 | **20s** | 首次解析略宽容 |
+| 前台下拉 / 手动刷新 | **6** | **15s** | `RssRefreshMode.foreground` |
+| 后台 WorkManager | **3** | **20s** | `runRssRefreshJob` 传 `background` |
+| 添加单源 `addFeed` | 1 | **20s** | `RssRefreshLimits.addFeedTimeout` |
 
-- `RssClient` 保持长生命周期；可选 `IOClient` + `maxConnectionsPerHost ≈ pool`。  
-- 超时 / 5xx / 解析失败：记入健康字段，**不**取消整个池。
+#### 15.10.4–6 批量写库 / 增量 UI / 健康度
 
-#### 15.10.4 批量写库
+- **批量：** 每源 `transaction` + `batch`；保 `isRead` / `isBookmarked`。  
+- **增量 UI 策略 A：** 下拉仍 `await` 整轮；过程中 Stream 已更新。策略 B 后置。  
+- **健康列（schema 9，无 UI）：** `lastSuccessAt` / `lastErrorAt` / `lastErrorMessage` / `consecutiveFailures` / `avgLatencyMs`（EWMA）。  
+- 成功 failures=0；失败 failures++；≥3 隔轮跳过；`refreshFeed` / `addFeed` 强制拉。
 
-**每源一个 `transaction`：**
+#### 15.10.7 ETag 回归
 
-1. 一次取出该 `feedId` 下相关 `guid`（或 `WHERE guid IN (...)`）。  
-2. 内存分成 insert / update。  
-3. 同事务批量写；优先利用 `UNIQUE(feedId, guid)`（`insertOnConflictUpdate` 若合适）。  
-4. 提交后 Stream **少次**通知（勿每篇一次）。  
+- [x] 304：更新 `lastFetchedAt` + health；etag/lastModified 保持（`rss_refresh_engine_test`）  
+- [x] 200 无 validator：库内写 **null**（同 + `rss_parser_test`）  
+- [x] YouTube 频道 **页** 仍不带旧 ETag（既有 `rss_parser_test`）  
+- [x] 条件头从 DB 读出再写入请求头（304 测校验 If-None-Match）
 
-保留：更新时不覆盖 `isRead` / `isBookmarked`。
+#### 15.10.8 实施切片状态
 
-#### 15.10.5 增量 UI
-
-| 策略 | 行为 | 本轮 |
+| 切片 | 内容 | 状态 |
 |------|------|------|
-| **A（默认）** | 下拉仍 `await` 整轮 pool 结束，但过程中 Stream 已更新列表 | **先做** |
-| B（可选） | 首源完成或 ~800ms 后结束 RefreshIndicator，后台继续刷 | 后置 |
+| **PR1 刷新引擎** | 有界并发 + 前后台 pool/timeout；写库单队列；每源 batch upsert | **已做**（单测） |
+| **PR2 ETag 锁** | 回归单测 | **已做** |
+| **PR3 健康度** | schema 9 + 排序/隔轮跳过 | **已做**（无 UI） |
 
-不要「全部源写完才 commit」。
+**本轮不做 / 仍后置：** 换 Dio、重写解析器、策略 B、OPML 导入并发、用户可见健康分、默认抬版本。
 
-#### 15.10.6 源健康度（用户不可见）
+#### 15.10.9 风险与验收
 
-**用途：** 调度排序 + 隔轮跳过；**不做**设置页仪表盘。
-
-建议 `feeds` 列（或等价存储，schema +1）：
-
-```text
-lastSuccessAt?
-lastErrorAt?
-lastErrorMessage?     # 调试；UI 默认不展示
-consecutiveFailures   # int, default 0
-avgLatencyMs?         # EWMA
-# score 可运行时算，不一定落库
-```
-
-**规则草案：**
-
-- 成功：failures=0，更新 latency EWMA，score 上浮。  
-- 超时 / 网络 / 5xx / 解析失败：failures++，score 降。  
-- 本轮排序：高分优先；failures≥N（如 3）→ **隔一轮跳过**，仍周期性探测。  
-- 用户「刷新此源」/ 添加源：**强制拉**，无视跳过。
-
-#### 15.10.7 ETag 回归（必测）
-
-- [ ] 304：只更新 `lastFetchedAt`；etag/lastModified 保持。  
-- [ ] 200 且响应无 etag/lastModified：库内对应列写 **null**（清过期 validator）。  
-- [ ] YouTube 频道 **页** 请求仍 **不**带旧 ETag（304 无 body 抽不出 channel id）。  
-- [ ] 条件头从 DB 读出再写入请求头（贯通集成测）。
-
-#### 15.10.8 实施切片
-
-| 切片 | 内容 | 验收 |
-|------|------|------|
-| **PR1 刷新引擎** | 有界并发 + 前后台 pool/timeout；写库单队列；每源 batch upsert | 30 mock 源墙钟 ≪ 串行；单源超时不拖死池 |
-| **PR2 ETag 锁** | 上表回归单测 / 夹具 | 不回退 0.0.7 行为 |
-| **PR3 健康度** | schema 字段 + 排序/隔轮跳过 | 无 UI；手动刷新强制拉 |
-
-**本轮不做：** 换 Dio、重写解析器、全站单事务刷完才 commit、用户可见健康分 UI、默认再抬版本（除非有可发版增量）。
-
-#### 15.10.9 风险
-
-- SQLite：并行 `write` → 用 **写队列** 串行 apply。  
-- 后台 isolate：独立 `AppDatabase` + `RssClient`；pool=3。  
-- 通知：`runRssRefreshJob` 可在整轮结束 diff，或收集每源 `newIds`。  
-- OPML 导入并发可后置，逻辑同池。
+- 写队列防 SQLITE_BUSY；后台 isolate 独立 DB + pool=3。  
+- 通知仍整轮 diff（行为不变）。  
+- **待真机：** 多源墙钟、坏源、已读/收藏、304。
 
 ### 15.6.1 已实现：音视频媒体类型与播放器（P1）
 
@@ -1224,7 +1184,8 @@ avgLatencyMs?         # EWMA
 | **0.0.7** | YouTube 规范 Atom + 去重；XML 声明编码；200 清除过期 ETag/Last-Modified；应用启动图标 |
 | **0.0.8** | Explore 雷达（功能真机 OK）；横向步骤 + sheet 选择；干净黑底白标图标；底栏可关 Explore |
 | **0.0.9** | 应用内浏览器：inApp 外链、深链确认、下载/收藏/历史、无痕、清理缓存；schema 8；CI 去掉 Aliyun；**真机通过** |
-| **未收口** | **RSS 刷新引擎 §15.10**；Explore 体验余项；公网实例波动文案；媒体 M3；流式；E-ROM 可选 |
+| **0.0.10** | **§15.10 RSS 刷新引擎**：有界并发（前台 6/15s · 后台 3/20s）+ 写库单队列 + 每源 batch upsert + 健康度骨架（schema 9）；ETag 回归单测；**未默认抬 UI** |
+| **未收口** | Explore 体验余项；公网实例波动文案；刷新 UI 策略 B；媒体 M3；流式；E-ROM 可选 |
 
 ### 15.9 会话记录
 
@@ -1271,7 +1232,14 @@ avgLatencyMs?         # EWMA
 - CI：去掉默认 Aliyun 镜像，显式 `storage.googleapis.com/download.flutter.io`  
 - tag `v0.0.9` · **用户真机综合测无问题**  
 
-**下会话（已写入 §15.10）：**  
+**0.0.10 RSS 刷新引擎：**  
+- `refreshAll` 有界并发池 + `RssRefreshMode` 超时分层；SQLite **写库单队列**  
+- 每源 batch upsert（保 isRead/isBookmarked）；Stream 增量（策略 A）  
+- schema 9 健康字段：排序 + failures≥3 隔轮跳过；手动刷新强制拉  
+- 单测 `test/rss_refresh_engine_test.dart`；WM adb 确认周期任务可注册  
+- tag `v0.0.10`  
+
+**下会话：**  
 1. **主路径** RSS 刷新：有界并发（前台 6 / 后台 3）+ 超时（15s / 20s）+ 批量写库 + 写队列串行 + Stream 增量 UI  
 2. ETag/304 回归锁；可选源健康度骨架（无 UI）  
 3. 余项：Explore / 媒体 M3 / 流式 / E-ROM  

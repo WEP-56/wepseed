@@ -10,6 +10,7 @@ import '../../data/db/app_database.dart';
 import '../../data/models/models.dart';
 import '../../data/repositories/drift_feed_repository.dart';
 import '../../data/repositories/settings_repository_impl.dart';
+import '../../data/rss/rss_refresh_config.dart';
 import 'comment_job_worker.dart';
 import 'notification_service.dart';
 
@@ -66,6 +67,7 @@ Future<bool> runRssRefreshJob() async {
     await feeds.refreshAll(
       wifiOnly: settings.wifiOnly,
       feedIds: filterIds.isEmpty ? null : filterIds,
+      mode: RssRefreshMode.background,
     );
 
     if (settings.notificationsEnabled) {

@@ -10,18 +10,21 @@ class RssClient {
 
   final http.Client _client;
 
-  static const _timeout = Duration(seconds: 25);
+  /// Fallback when callers omit [timeout] (prefer mode-specific limits).
+  static const defaultTimeout = Duration(seconds: 20);
   static const _userAgent = 'WEPSEED/1.0 (local-first RSS reader)';
 
   Future<FeedFetchResult> fetch(
     String url, {
     String? etag,
     String? lastModified,
+    Duration? timeout,
   }) async {
     final uri = Uri.tryParse(url.trim());
     if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
       throw RssException('请输入有效的 http(s) 订阅地址');
     }
+    final effectiveTimeout = timeout ?? defaultTimeout;
 
     final youtubeChannelId = _youtubeChannelIdFromUri(uri);
     if (youtubeChannelId != null) {
@@ -29,6 +32,7 @@ class RssClient {
         _youtubeFeedUri(youtubeChannelId),
         etag: etag,
         lastModified: lastModified,
+        timeout: effectiveTimeout,
       );
     }
 
@@ -36,20 +40,31 @@ class RssClient {
     // its official Atom endpoint. Do not send page validators: a 304 page has
     // no body from which to recover the canonical feed URL.
     if (_isYouTubeChannelPage(uri)) {
-      final page = await _fetchUri(uri);
+      final page = await _fetchUri(uri, timeout: effectiveTimeout);
       if (page.notModified || page.body == null) return page;
       final channelId = _youtubeChannelIdFromHtml(page.body!);
-      if (channelId != null) return _fetchUri(_youtubeFeedUri(channelId));
+      if (channelId != null) {
+        return _fetchUri(
+          _youtubeFeedUri(channelId),
+          timeout: effectiveTimeout,
+        );
+      }
       return page;
     }
 
-    return _fetchUri(uri, etag: etag, lastModified: lastModified);
+    return _fetchUri(
+      uri,
+      etag: etag,
+      lastModified: lastModified,
+      timeout: effectiveTimeout,
+    );
   }
 
   Future<FeedFetchResult> _fetchUri(
     Uri uri, {
     String? etag,
     String? lastModified,
+    required Duration timeout,
   }) async {
     final headers = <String, String>{
       'User-Agent': _userAgent,
@@ -63,7 +78,7 @@ class RssClient {
 
     late http.Response response;
     try {
-      response = await _client.get(uri, headers: headers).timeout(_timeout);
+      response = await _client.get(uri, headers: headers).timeout(timeout);
     } on Exception catch (e) {
       throw RssException(_networkMessage(e));
     }

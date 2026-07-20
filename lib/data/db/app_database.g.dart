@@ -115,6 +115,62 @@ class $FeedsTable extends Feeds with TableInfo<$FeedsTable, FeedRow> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _lastSuccessAtMeta = const VerificationMeta(
+    'lastSuccessAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSuccessAt =
+      GeneratedColumn<DateTime>(
+        'last_success_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastErrorAtMeta = const VerificationMeta(
+    'lastErrorAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastErrorAt = GeneratedColumn<DateTime>(
+    'last_error_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastErrorMessageMeta = const VerificationMeta(
+    'lastErrorMessage',
+  );
+  @override
+  late final GeneratedColumn<String> lastErrorMessage = GeneratedColumn<String>(
+    'last_error_message',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _consecutiveFailuresMeta =
+      const VerificationMeta('consecutiveFailures');
+  @override
+  late final GeneratedColumn<int> consecutiveFailures = GeneratedColumn<int>(
+    'consecutive_failures',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _avgLatencyMsMeta = const VerificationMeta(
+    'avgLatencyMs',
+  );
+  @override
+  late final GeneratedColumn<int> avgLatencyMs = GeneratedColumn<int>(
+    'avg_latency_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -127,6 +183,11 @@ class $FeedsTable extends Feeds with TableInfo<$FeedsTable, FeedRow> {
     lastModified,
     isPaused,
     createdAt,
+    lastSuccessAt,
+    lastErrorAt,
+    lastErrorMessage,
+    consecutiveFailures,
+    avgLatencyMs,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -211,6 +272,51 @@ class $FeedsTable extends Feeds with TableInfo<$FeedsTable, FeedRow> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('last_success_at')) {
+      context.handle(
+        _lastSuccessAtMeta,
+        lastSuccessAt.isAcceptableOrUnknown(
+          data['last_success_at']!,
+          _lastSuccessAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_error_at')) {
+      context.handle(
+        _lastErrorAtMeta,
+        lastErrorAt.isAcceptableOrUnknown(
+          data['last_error_at']!,
+          _lastErrorAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_error_message')) {
+      context.handle(
+        _lastErrorMessageMeta,
+        lastErrorMessage.isAcceptableOrUnknown(
+          data['last_error_message']!,
+          _lastErrorMessageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('consecutive_failures')) {
+      context.handle(
+        _consecutiveFailuresMeta,
+        consecutiveFailures.isAcceptableOrUnknown(
+          data['consecutive_failures']!,
+          _consecutiveFailuresMeta,
+        ),
+      );
+    }
+    if (data.containsKey('avg_latency_ms')) {
+      context.handle(
+        _avgLatencyMsMeta,
+        avgLatencyMs.isAcceptableOrUnknown(
+          data['avg_latency_ms']!,
+          _avgLatencyMsMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -264,6 +370,26 @@ class $FeedsTable extends Feeds with TableInfo<$FeedsTable, FeedRow> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      lastSuccessAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_success_at'],
+      ),
+      lastErrorAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_error_at'],
+      ),
+      lastErrorMessage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error_message'],
+      ),
+      consecutiveFailures: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}consecutive_failures'],
+      )!,
+      avgLatencyMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}avg_latency_ms'],
+      ),
     );
   }
 
@@ -284,6 +410,13 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
   final String? lastModified;
   final bool isPaused;
   final DateTime createdAt;
+
+  /// Scheduler-only health (§15.10.6). Not shown in product UI.
+  final DateTime? lastSuccessAt;
+  final DateTime? lastErrorAt;
+  final String? lastErrorMessage;
+  final int consecutiveFailures;
+  final int? avgLatencyMs;
   const FeedRow({
     required this.id,
     required this.title,
@@ -295,6 +428,11 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
     this.lastModified,
     required this.isPaused,
     required this.createdAt,
+    this.lastSuccessAt,
+    this.lastErrorAt,
+    this.lastErrorMessage,
+    required this.consecutiveFailures,
+    this.avgLatencyMs,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -319,6 +457,19 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
     }
     map['is_paused'] = Variable<bool>(isPaused);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || lastSuccessAt != null) {
+      map['last_success_at'] = Variable<DateTime>(lastSuccessAt);
+    }
+    if (!nullToAbsent || lastErrorAt != null) {
+      map['last_error_at'] = Variable<DateTime>(lastErrorAt);
+    }
+    if (!nullToAbsent || lastErrorMessage != null) {
+      map['last_error_message'] = Variable<String>(lastErrorMessage);
+    }
+    map['consecutive_failures'] = Variable<int>(consecutiveFailures);
+    if (!nullToAbsent || avgLatencyMs != null) {
+      map['avg_latency_ms'] = Variable<int>(avgLatencyMs);
+    }
     return map;
   }
 
@@ -342,6 +493,19 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
           : Value(lastModified),
       isPaused: Value(isPaused),
       createdAt: Value(createdAt),
+      lastSuccessAt: lastSuccessAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSuccessAt),
+      lastErrorAt: lastErrorAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastErrorAt),
+      lastErrorMessage: lastErrorMessage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastErrorMessage),
+      consecutiveFailures: Value(consecutiveFailures),
+      avgLatencyMs: avgLatencyMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(avgLatencyMs),
     );
   }
 
@@ -361,6 +525,13 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
       lastModified: serializer.fromJson<String?>(json['lastModified']),
       isPaused: serializer.fromJson<bool>(json['isPaused']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      lastSuccessAt: serializer.fromJson<DateTime?>(json['lastSuccessAt']),
+      lastErrorAt: serializer.fromJson<DateTime?>(json['lastErrorAt']),
+      lastErrorMessage: serializer.fromJson<String?>(json['lastErrorMessage']),
+      consecutiveFailures: serializer.fromJson<int>(
+        json['consecutiveFailures'],
+      ),
+      avgLatencyMs: serializer.fromJson<int?>(json['avgLatencyMs']),
     );
   }
   @override
@@ -377,6 +548,11 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
       'lastModified': serializer.toJson<String?>(lastModified),
       'isPaused': serializer.toJson<bool>(isPaused),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'lastSuccessAt': serializer.toJson<DateTime?>(lastSuccessAt),
+      'lastErrorAt': serializer.toJson<DateTime?>(lastErrorAt),
+      'lastErrorMessage': serializer.toJson<String?>(lastErrorMessage),
+      'consecutiveFailures': serializer.toJson<int>(consecutiveFailures),
+      'avgLatencyMs': serializer.toJson<int?>(avgLatencyMs),
     };
   }
 
@@ -391,6 +567,11 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
     Value<String?> lastModified = const Value.absent(),
     bool? isPaused,
     DateTime? createdAt,
+    Value<DateTime?> lastSuccessAt = const Value.absent(),
+    Value<DateTime?> lastErrorAt = const Value.absent(),
+    Value<String?> lastErrorMessage = const Value.absent(),
+    int? consecutiveFailures,
+    Value<int?> avgLatencyMs = const Value.absent(),
   }) => FeedRow(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -404,6 +585,15 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
     lastModified: lastModified.present ? lastModified.value : this.lastModified,
     isPaused: isPaused ?? this.isPaused,
     createdAt: createdAt ?? this.createdAt,
+    lastSuccessAt: lastSuccessAt.present
+        ? lastSuccessAt.value
+        : this.lastSuccessAt,
+    lastErrorAt: lastErrorAt.present ? lastErrorAt.value : this.lastErrorAt,
+    lastErrorMessage: lastErrorMessage.present
+        ? lastErrorMessage.value
+        : this.lastErrorMessage,
+    consecutiveFailures: consecutiveFailures ?? this.consecutiveFailures,
+    avgLatencyMs: avgLatencyMs.present ? avgLatencyMs.value : this.avgLatencyMs,
   );
   FeedRow copyWithCompanion(FeedsCompanion data) {
     return FeedRow(
@@ -421,6 +611,21 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
           : this.lastModified,
       isPaused: data.isPaused.present ? data.isPaused.value : this.isPaused,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastSuccessAt: data.lastSuccessAt.present
+          ? data.lastSuccessAt.value
+          : this.lastSuccessAt,
+      lastErrorAt: data.lastErrorAt.present
+          ? data.lastErrorAt.value
+          : this.lastErrorAt,
+      lastErrorMessage: data.lastErrorMessage.present
+          ? data.lastErrorMessage.value
+          : this.lastErrorMessage,
+      consecutiveFailures: data.consecutiveFailures.present
+          ? data.consecutiveFailures.value
+          : this.consecutiveFailures,
+      avgLatencyMs: data.avgLatencyMs.present
+          ? data.avgLatencyMs.value
+          : this.avgLatencyMs,
     );
   }
 
@@ -436,7 +641,12 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
           ..write('etag: $etag, ')
           ..write('lastModified: $lastModified, ')
           ..write('isPaused: $isPaused, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastSuccessAt: $lastSuccessAt, ')
+          ..write('lastErrorAt: $lastErrorAt, ')
+          ..write('lastErrorMessage: $lastErrorMessage, ')
+          ..write('consecutiveFailures: $consecutiveFailures, ')
+          ..write('avgLatencyMs: $avgLatencyMs')
           ..write(')'))
         .toString();
   }
@@ -453,6 +663,11 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
     lastModified,
     isPaused,
     createdAt,
+    lastSuccessAt,
+    lastErrorAt,
+    lastErrorMessage,
+    consecutiveFailures,
+    avgLatencyMs,
   );
   @override
   bool operator ==(Object other) =>
@@ -467,7 +682,12 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
           other.etag == this.etag &&
           other.lastModified == this.lastModified &&
           other.isPaused == this.isPaused &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.lastSuccessAt == this.lastSuccessAt &&
+          other.lastErrorAt == this.lastErrorAt &&
+          other.lastErrorMessage == this.lastErrorMessage &&
+          other.consecutiveFailures == this.consecutiveFailures &&
+          other.avgLatencyMs == this.avgLatencyMs);
 }
 
 class FeedsCompanion extends UpdateCompanion<FeedRow> {
@@ -481,6 +701,11 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
   final Value<String?> lastModified;
   final Value<bool> isPaused;
   final Value<DateTime> createdAt;
+  final Value<DateTime?> lastSuccessAt;
+  final Value<DateTime?> lastErrorAt;
+  final Value<String?> lastErrorMessage;
+  final Value<int> consecutiveFailures;
+  final Value<int?> avgLatencyMs;
   final Value<int> rowid;
   const FeedsCompanion({
     this.id = const Value.absent(),
@@ -493,6 +718,11 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
     this.lastModified = const Value.absent(),
     this.isPaused = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.lastSuccessAt = const Value.absent(),
+    this.lastErrorAt = const Value.absent(),
+    this.lastErrorMessage = const Value.absent(),
+    this.consecutiveFailures = const Value.absent(),
+    this.avgLatencyMs = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   FeedsCompanion.insert({
@@ -506,6 +736,11 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
     this.lastModified = const Value.absent(),
     this.isPaused = const Value.absent(),
     required DateTime createdAt,
+    this.lastSuccessAt = const Value.absent(),
+    this.lastErrorAt = const Value.absent(),
+    this.lastErrorMessage = const Value.absent(),
+    this.consecutiveFailures = const Value.absent(),
+    this.avgLatencyMs = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -522,6 +757,11 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
     Expression<String>? lastModified,
     Expression<bool>? isPaused,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? lastSuccessAt,
+    Expression<DateTime>? lastErrorAt,
+    Expression<String>? lastErrorMessage,
+    Expression<int>? consecutiveFailures,
+    Expression<int>? avgLatencyMs,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -535,6 +775,12 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
       if (lastModified != null) 'last_modified': lastModified,
       if (isPaused != null) 'is_paused': isPaused,
       if (createdAt != null) 'created_at': createdAt,
+      if (lastSuccessAt != null) 'last_success_at': lastSuccessAt,
+      if (lastErrorAt != null) 'last_error_at': lastErrorAt,
+      if (lastErrorMessage != null) 'last_error_message': lastErrorMessage,
+      if (consecutiveFailures != null)
+        'consecutive_failures': consecutiveFailures,
+      if (avgLatencyMs != null) 'avg_latency_ms': avgLatencyMs,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -550,6 +796,11 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
     Value<String?>? lastModified,
     Value<bool>? isPaused,
     Value<DateTime>? createdAt,
+    Value<DateTime?>? lastSuccessAt,
+    Value<DateTime?>? lastErrorAt,
+    Value<String?>? lastErrorMessage,
+    Value<int>? consecutiveFailures,
+    Value<int?>? avgLatencyMs,
     Value<int>? rowid,
   }) {
     return FeedsCompanion(
@@ -563,6 +814,11 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
       lastModified: lastModified ?? this.lastModified,
       isPaused: isPaused ?? this.isPaused,
       createdAt: createdAt ?? this.createdAt,
+      lastSuccessAt: lastSuccessAt ?? this.lastSuccessAt,
+      lastErrorAt: lastErrorAt ?? this.lastErrorAt,
+      lastErrorMessage: lastErrorMessage ?? this.lastErrorMessage,
+      consecutiveFailures: consecutiveFailures ?? this.consecutiveFailures,
+      avgLatencyMs: avgLatencyMs ?? this.avgLatencyMs,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -600,6 +856,21 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (lastSuccessAt.present) {
+      map['last_success_at'] = Variable<DateTime>(lastSuccessAt.value);
+    }
+    if (lastErrorAt.present) {
+      map['last_error_at'] = Variable<DateTime>(lastErrorAt.value);
+    }
+    if (lastErrorMessage.present) {
+      map['last_error_message'] = Variable<String>(lastErrorMessage.value);
+    }
+    if (consecutiveFailures.present) {
+      map['consecutive_failures'] = Variable<int>(consecutiveFailures.value);
+    }
+    if (avgLatencyMs.present) {
+      map['avg_latency_ms'] = Variable<int>(avgLatencyMs.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -619,6 +890,11 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
           ..write('lastModified: $lastModified, ')
           ..write('isPaused: $isPaused, ')
           ..write('createdAt: $createdAt, ')
+          ..write('lastSuccessAt: $lastSuccessAt, ')
+          ..write('lastErrorAt: $lastErrorAt, ')
+          ..write('lastErrorMessage: $lastErrorMessage, ')
+          ..write('consecutiveFailures: $consecutiveFailures, ')
+          ..write('avgLatencyMs: $avgLatencyMs, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8682,6 +8958,11 @@ typedef $$FeedsTableCreateCompanionBuilder =
       Value<String?> lastModified,
       Value<bool> isPaused,
       required DateTime createdAt,
+      Value<DateTime?> lastSuccessAt,
+      Value<DateTime?> lastErrorAt,
+      Value<String?> lastErrorMessage,
+      Value<int> consecutiveFailures,
+      Value<int?> avgLatencyMs,
       Value<int> rowid,
     });
 typedef $$FeedsTableUpdateCompanionBuilder =
@@ -8696,6 +8977,11 @@ typedef $$FeedsTableUpdateCompanionBuilder =
       Value<String?> lastModified,
       Value<bool> isPaused,
       Value<DateTime> createdAt,
+      Value<DateTime?> lastSuccessAt,
+      Value<DateTime?> lastErrorAt,
+      Value<String?> lastErrorMessage,
+      Value<int> consecutiveFailures,
+      Value<int?> avgLatencyMs,
       Value<int> rowid,
     });
 
@@ -8777,6 +9063,31 @@ class $$FeedsTableFilterComposer extends Composer<_$AppDatabase, $FeedsTable> {
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSuccessAt => $composableBuilder(
+    column: $table.lastSuccessAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastErrorAt => $composableBuilder(
+    column: $table.lastErrorAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastErrorMessage => $composableBuilder(
+    column: $table.lastErrorMessage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get consecutiveFailures => $composableBuilder(
+    column: $table.consecutiveFailures,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get avgLatencyMs => $composableBuilder(
+    column: $table.avgLatencyMs,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8864,6 +9175,31 @@ class $$FeedsTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get lastSuccessAt => $composableBuilder(
+    column: $table.lastSuccessAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastErrorAt => $composableBuilder(
+    column: $table.lastErrorAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastErrorMessage => $composableBuilder(
+    column: $table.lastErrorMessage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get consecutiveFailures => $composableBuilder(
+    column: $table.consecutiveFailures,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get avgLatencyMs => $composableBuilder(
+    column: $table.avgLatencyMs,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$FeedsTableAnnotationComposer
@@ -8908,6 +9244,31 @@ class $$FeedsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSuccessAt => $composableBuilder(
+    column: $table.lastSuccessAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastErrorAt => $composableBuilder(
+    column: $table.lastErrorAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastErrorMessage => $composableBuilder(
+    column: $table.lastErrorMessage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get consecutiveFailures => $composableBuilder(
+    column: $table.consecutiveFailures,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get avgLatencyMs => $composableBuilder(
+    column: $table.avgLatencyMs,
+    builder: (column) => column,
+  );
 
   Expression<T> articlesRefs<T extends Object>(
     Expression<T> Function($$ArticlesTableAnnotationComposer a) f,
@@ -8973,6 +9334,11 @@ class $$FeedsTableTableManager
                 Value<String?> lastModified = const Value.absent(),
                 Value<bool> isPaused = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> lastSuccessAt = const Value.absent(),
+                Value<DateTime?> lastErrorAt = const Value.absent(),
+                Value<String?> lastErrorMessage = const Value.absent(),
+                Value<int> consecutiveFailures = const Value.absent(),
+                Value<int?> avgLatencyMs = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FeedsCompanion(
                 id: id,
@@ -8985,6 +9351,11 @@ class $$FeedsTableTableManager
                 lastModified: lastModified,
                 isPaused: isPaused,
                 createdAt: createdAt,
+                lastSuccessAt: lastSuccessAt,
+                lastErrorAt: lastErrorAt,
+                lastErrorMessage: lastErrorMessage,
+                consecutiveFailures: consecutiveFailures,
+                avgLatencyMs: avgLatencyMs,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -8999,6 +9370,11 @@ class $$FeedsTableTableManager
                 Value<String?> lastModified = const Value.absent(),
                 Value<bool> isPaused = const Value.absent(),
                 required DateTime createdAt,
+                Value<DateTime?> lastSuccessAt = const Value.absent(),
+                Value<DateTime?> lastErrorAt = const Value.absent(),
+                Value<String?> lastErrorMessage = const Value.absent(),
+                Value<int> consecutiveFailures = const Value.absent(),
+                Value<int?> avgLatencyMs = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FeedsCompanion.insert(
                 id: id,
@@ -9011,6 +9387,11 @@ class $$FeedsTableTableManager
                 lastModified: lastModified,
                 isPaused: isPaused,
                 createdAt: createdAt,
+                lastSuccessAt: lastSuccessAt,
+                lastErrorAt: lastErrorAt,
+                lastErrorMessage: lastErrorMessage,
+                consecutiveFailures: consecutiveFailures,
+                avgLatencyMs: avgLatencyMs,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../mock/mock_data.dart';
 import '../models/models.dart';
+import '../rss/rss_refresh_config.dart';
 import 'feed_repository.dart';
 
 class MockFeedRepository implements FeedRepository {
@@ -49,6 +50,7 @@ class MockFeedRepository implements FeedRepository {
   Future<void> refreshAll({
     bool wifiOnly = false,
     Iterable<String>? feedIds,
+    RssRefreshMode mode = RssRefreshMode.foreground,
   }) async {
     // no-op in mock
   }

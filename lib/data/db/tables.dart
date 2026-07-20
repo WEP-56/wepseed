@@ -13,6 +13,14 @@ class Feeds extends Table {
   BoolColumn get isPaused => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime()();
 
+  /// Scheduler-only health (§15.10.6). Not shown in product UI.
+  DateTimeColumn get lastSuccessAt => dateTime().nullable()();
+  DateTimeColumn get lastErrorAt => dateTime().nullable()();
+  TextColumn get lastErrorMessage => text().nullable()();
+  IntColumn get consecutiveFailures =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get avgLatencyMs => integer().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 
